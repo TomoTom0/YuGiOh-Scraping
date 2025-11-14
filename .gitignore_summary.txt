@@ -1,0 +1,16 @@
+# Git管理対象ファイル（コミットされる）
+✅ スクリプトファイル (*.ts)
+✅ README.md ファイル
+✅ .gitignore
+✅ package.json
+
+# Git除外ファイル（コミットされない）
+❌ 出力データ (*.tsv) - 自動生成可能
+❌ 認証情報 (cookies.txt) - セキュリティ上重要
+❌ 中間ファイル (*-temp-*.tsv)
+❌ アーカイブ (_archived/)
+❌ ログ (logs/, *.log)
+❌ node_modules/
+❌ テストデータ (test/)
+
+合計: 13ファイルがコミット対象

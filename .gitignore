@@ -1,0 +1,64 @@
+# スクレイピング成果物（自動生成可能なため除外）
+# Output files - TSV data files
+cards-data/output/*.tsv
+cards-detail/output/*.tsv
+faq/output/*.tsv
+
+# 入力データ（cards-dataからコピーされたファイル）
+cards-detail/input/*.tsv
+faq/input/*.tsv
+
+# 認証情報（重要: 絶対にコミットしない）
+# Cookies - authentication data
+**/config/cookies.txt
+**/config/cookies-faq.txt
+
+# 一時ファイル・中間ファイル
+# Temporary and intermediate files
+**/temp/
+**/*-temp-*.tsv
+
+# ログファイル
+# Log files
+logs/
+*.log
+
+# テストデータ
+# Test data
+**/test/
+
+# アーカイブフォルダ
+# Archived files
+_archived/
+
+# 元データ（HTMLファイル等）
+# Raw data files
+**/raw/
+
+# ドキュメント（分析用、任意で除外）
+# Documentation (optional)
+**/docs/analyze/
+
+# Node.js
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# その他
+# Other
+package-lock.json
+yarn.lock
