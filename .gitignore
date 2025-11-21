@@ -39,6 +39,20 @@ _archived/
 # Documentation (optional)
 **/docs/analyze/
 
+# TypeScript build outputs
+# ビルド成果物
+**/*.d.ts
+**/*.d.ts.map
+**/*.js
+**/*.js.map
+!**/*.config.js
+
+# HTMLファイル（スクレイピング元データ）
+**/cards/*.html
+
+# 参照用フォルダ
+_ref/
+
 # Node.js
 # Node modules
 node_modules/
@@ -60,5 +74,4 @@ Thumbs.db
 
 # その他
 # Other
-package-lock.json
 yarn.lock

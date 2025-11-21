@@ -4,8 +4,8 @@
 
 遊戯王公式カードデータベース（https://www.db.yugioh-card.com/）から、カード情報とFAQ情報を取得するプロジェクトです。
 
-**最終更新日**: 2025-11-14
-**ステータス**: ✅ **全データ取得完了**
+**最終更新日**: 2025-11-21
+**ステータス**: ✅ **全データ取得完了 + 増分取得機能追加**
 
 ---
 
@@ -36,10 +36,16 @@ scraping/
 
 **カラム**:
 ```
-cardType | name | ruby | cardId | ciid | imgs | text | attribute | levelType |
-levelValue | race | types | atk | def | linkMarkers | pendulumScale |
-pendulumEffect | isExtraDeck | spellEffectType | trapEffectType
+cardType | name | nameModified | ruby | cardId | ciid | imgs | text | biko |
+isNotLegalForOfficial | attribute | levelType | levelValue | race | monsterTypes |
+atk | def | linkMarkers | pendulumScale | pendulumText | isExtraDeck |
+spellEffectType | trapEffectType
 ```
+
+**追加カラム（2025-11-21）**:
+- `nameModified`: 検索用正規化カード名
+- `biko`: 備考情報（例: 公式のデュエルでは使用できません）
+- `isNotLegalForOfficial`: 公式使用不可フラグ（true/false）
 
 ### 2. cards-detail/ - カード補足情報
 
@@ -90,13 +96,33 @@ faqId | question | answer | updatedAt
    ```
 3. **認証情報**: `config/cookies.txt`ファイルが必要
 
-### Cookieファイルの取得方法
+### Cookie/セッションについて
+
+#### なぜCookieが必要なのか
+
+遊戯王カードデータベースでは、FAQ検索やカード詳細ページへのアクセスにセッション管理が使用されています。セッションがない状態でAPIリクエストを送ると、データが返却されません。
+
+#### セッション維持の仕組み
+
+1. **検索ページにアクセス** → セッションCookieが発行される
+2. **セッションCookieを付与してリクエスト** → データが返却される
+
+スクリプトによってセッション確立方法が異なります：
+- **faq/fetch-incremental.ts**: 自動でセッションを確立（FAQ検索ページにアクセス）
+- **cards-detail/fetch-qa-all.ts**: cookies.txtファイルが必要
+
+#### Cookieファイルの取得方法
 
 1. ブラウザで遊戯王カードデータベース（https://www.db.yugioh-card.com/）にアクセス
-2. ブラウザの開発者ツールを開く（F12）
-3. Networkタブでリクエストを確認
-4. Cookieをエクスポート（Netscape形式）
-5. `cards-detail/config/cookies.txt` と `faq/config/cookies.txt` に保存
+2. FAQ検索ページ（https://www.db.yugioh-card.com/yugiohdb/faq_search.action）を開く
+3. ブラウザの開発者ツールを開く（F12）
+4. Applicationタブ → Cookies → www.db.yugioh-card.comを確認
+5. Cookieエクスポート拡張機能を使用してNetscape形式でエクスポート
+6. `cards-detail/config/cookies.txt` と `faq/config/cookies.txt` に保存
+
+**必要なCookie**: `JSESSIONID`, `AWSALB`, `AWSALBCORS`, `incap_ses_*`, `nlbi_*`, `visid_incap_*`
+
+**有効期限**: セッションCookieは数時間で失効するため、長時間の取得処理では途中で更新が必要な場合があります
 
 ### 実行手順
 
@@ -149,6 +175,58 @@ npx tsx fetch-faq-from-list.ts --start-from=4000
 ```
 
 **所要時間**: 約3時間30分（FAQ ID一覧: 2分 + FAQ詳細: 3時間30分）
+
+---
+
+## 🔄 増分取得（差分更新）
+
+既存データに新規分のみを追加する増分取得機能を提供しています。
+
+### cards-data 増分取得
+
+新しいカードのみを取得してTSVに追加します。
+
+```bash
+cd cards-data/scripts
+npx tsx fetch-incremental.ts
+
+# 出力: cards-data/output/cards-all.tsv（新規カードが先頭に追加）
+```
+
+- **ソート**: 発売日順（新しい順: sort=21）
+- **停止条件**: 既存cardIdを検出したら停止
+- **所要時間**: 新規カード数に依存（通常は数分）
+
+### faq 増分取得
+
+新しいFAQのみを取得してTSVに追加します。
+
+```bash
+cd faq/scripts
+npx tsx fetch-incremental.ts
+
+# 出力: faq/output/faq-all.tsv（新規FAQが先頭に追加）
+```
+
+- **ソート**: 更新日時順（新しい順: sort=2）
+- **セッション**: 自動確立（cookies.txt不要）
+- **停止条件**: 既存faqIdを検出したら停止
+- **所要時間**: 新規FAQ数に依存（通常は数分）
+
+### cards-detail 増分取得
+
+新しいカードIDのみ補足情報を取得してTSVに追加します。
+
+```bash
+cd cards-detail/scripts
+npx tsx fetch-incremental.ts
+
+# 出力: cards-detail/output/qa-all.tsv（新規データが先頭に追加）
+```
+
+- **比較**: cards-all.tsv と qa-all.tsv のcardIdを比較
+- **取得対象**: cards-all.tsvにあってqa-all.tsvにないcardId
+- **所要時間**: 新規カード数 × 1秒
 
 ---
 
@@ -293,6 +371,15 @@ wc -l faq/output/faq-all.tsv               # 12578行
 ---
 
 ## 📝 変更履歴
+
+### 2025-11-21
+- ✅ biko情報（備考・公式使用不可フラグ）をcards-dataに追加
+- ✅ 増分取得機能を実装
+  - cards-data/scripts/fetch-incremental.ts
+  - faq/scripts/fetch-incremental.ts
+  - cards-detail/scripts/fetch-incremental.ts
+- ✅ Cookie/セッション説明を改善
+- ✅ READMEに増分取得セクションを追加
 
 ### 2025-11-14
 - ✅ 全データ取得完了
