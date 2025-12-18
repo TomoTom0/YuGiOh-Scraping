@@ -20,9 +20,10 @@ function establishSession(): Promise<string> {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       }
     }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8');
         // Set-Cookieヘッダーからセッションを取得
         const cookies: string[] = [];
         const setCookieHeaders = res.headers['set-cookie'];
@@ -65,9 +66,10 @@ async function fetchFaqIdListFromPage(page: number, rp: number, cookieJar: strin
         'Cookie': cookieJar
       }
     }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8');
         try {
           const dom = new JSDOM(html, { url });
           const doc = dom.window.document as unknown as Document;

@@ -108,9 +108,10 @@ async function fetchFaqDetail(faqId: string, cookieJar: string): Promise<{
         'Cookie': cookieJar
       }
     }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8');
         try {
           const dom = new JSDOM(html, { url });
           const doc = dom.window.document as unknown as Document;
