@@ -6,7 +6,7 @@ import https from 'https';
 import { establishSession } from '../utils/session.js';
 import { fetchFaqDetail, type FaqDetail } from '../utils/fetchers.js';
 import { escapeForTsv } from '../utils/formatters.js';
-import { sleep } from '../utils/helpers.js';
+import { sleep, parseScrapingMode } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,7 +45,7 @@ interface FetchResult {
 // ============================================================================
 
 /**
- * 既存TSVからfaqIdと更新日時のマップを読み込む
+ * 既存TSVからfaqIdと更新日時をMapで読み込む
  */
 function loadExistingFaqsWithDate(tsvPath: string): Map<string, string> {
   const faqMap = new Map<string, string>();
@@ -64,8 +64,8 @@ function loadExistingFaqsWithDate(tsvPath: string): Map<string, string> {
     if (!line.trim()) continue;
 
     const fields = line.split('\t');
-    const faqId = fields[0]; // faqIdは1番目のフィールド
-    const updatedAt = fields[3] || ''; // updatedAtは4番目のフィールド
+    const faqId = fields[0];
+    const updatedAt = fields[3] || '';
     if (faqId) {
       faqMap.set(faqId, updatedAt);
     }
@@ -76,36 +76,169 @@ function loadExistingFaqsWithDate(tsvPath: string): Map<string, string> {
 }
 
 /**
- * FAQ一覧ページからfaqIdリストを取得
+ * 新しい方から指定件数を取得
  */
-function fetchFaqIdListFromPage(page: number, cookieJar: string): Promise<string[]> {
-  const url = `${CONFIG.BASE_URL}?ope=2&stype=2&keyword=&tag=-1&sort=${CONFIG.SORT_UPDATED}&rp=${CONFIG.RESULTS_PER_PAGE}&page=${page}`;
+async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
+  const faqs: FaqInfo[] = [];
+  let totalFetched = 0;
+  let page = 1;
 
-  console.log(`  フェッチ中: ${url}`);
+  console.log(`新しい方から ${n} 件取得\n`);
 
-  return new Promise((resolve) => {
+  while (faqs.length < n) {
+    console.log(`ページ ${page} を処理中...`);
+
+    try {
+      const faqIds = await fetchFaqListPage(page, cookieJar);
+
+      if (faqIds.length === 0) {
+        console.log('  FAQが見つかりませんでした。終了します。');
+        break;
+      }
+
+      console.log(`  ${faqIds.length} 件のFAQ IDを取得`);
+      totalFetched += faqIds.length;
+
+      // 必要な件数まで取得
+      const remaining = n - faqs.length;
+      const toFetch = faqIds.slice(0, remaining);
+
+      for (let i = 0; i < toFetch.length; i++) {
+        const faqId = toFetch[i];
+        const detail = await fetchFaqDetail(faqId, cookieJar);
+        
+        if (detail) {
+          faqs.push(detail);
+        }
+
+        if (i < toFetch.length - 1 || faqs.length < n) {
+          await sleep(CONFIG.DELAY_MS);
+        }
+      }
+
+      console.log(`  取得: ${toFetch.length} 件 (合計: ${faqs.length}/${n})`);
+
+      if (faqs.length >= n) {
+        break;
+      }
+
+      // 次のページがあるかチェック
+      if (faqIds.length < CONFIG.RESULTS_PER_PAGE) {
+        console.log('  最終ページに到達しました。');
+        break;
+      }
+
+      page++;
+      await sleep(CONFIG.DELAY_MS);
+
+    } catch (error) {
+      console.error(`  エラー: ${error}`);
+      break;
+    }
+  }
+
+  return faqs;
+}
+
+/**
+ * 指定範囲を取得 (start位置からlength件)
+ */
+async function fetchRange(start: number, length: number, cookieJar: string): Promise<FaqInfo[]> {
+  const faqs: FaqInfo[] = [];
+  let currentIndex = 0;
+  let page = 1;
+
+  console.log(`範囲取得: ${start}番目から${length}件 (${start} ~ ${start + length - 1})\n`);
+
+  while (faqs.length < length) {
+    console.log(`ページ ${page} を処理中...`);
+
+    try {
+      const faqIds = await fetchFaqListPage(page, cookieJar);
+
+      if (faqIds.length === 0) {
+        console.log('  FAQが見つかりませんでした。終了します。');
+        break;
+      }
+
+      console.log(`  ${faqIds.length} 件のFAQ IDを取得`);
+
+      // 各FAQ IDをチェック
+      for (const faqId of faqIds) {
+        // start位置より前はスキップ
+        if (currentIndex < start) {
+          currentIndex++;
+          continue;
+        }
+
+        // 必要な件数に達したら終了
+        if (faqs.length >= length) {
+          break;
+        }
+
+        // 詳細を取得
+        const detail = await fetchFaqDetail(faqId, cookieJar);
+        if (detail) {
+          faqs.push(detail);
+        }
+
+        currentIndex++;
+        await sleep(CONFIG.DELAY_MS);
+      }
+
+      console.log(`  取得: (合計: ${faqs.length}/${length})`);
+
+      if (faqs.length >= length) {
+        break;
+      }
+
+      // 次のページがあるかチェック
+      if (faqIds.length < CONFIG.RESULTS_PER_PAGE) {
+        console.log('  最終ページに到達しました。');
+        break;
+      }
+
+      page++;
+      await sleep(CONFIG.DELAY_MS);
+
+    } catch (error) {
+      console.error(`  エラー: ${error}`);
+      break;
+    }
+  }
+
+  return faqs;
+}
+
+/**
+ * FAQリストページからFAQ IDを取得
+ */
+async function fetchFaqListPage(page: number, cookieJar: string): Promise<string[]> {
+  const url = `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=2&stype=2&keyword=&tag=-1&sort=2&rp=${CONFIG.RESULTS_PER_PAGE}&page=${page}`;
+
+  return new Promise((resolve, reject) => {
     https.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookieJar
+        'Cookie': cookieJar,
+        'User-Agent': 'Mozilla/5.0'
       }
     }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk) => { chunks.push(chunk); });
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
-        const html = Buffer.concat(chunks).toString('utf8');
         try {
-          const dom = new JSDOM(html, { url });
-          const doc = dom.window.document as unknown as Document;
-
-          const faqIds: string[] = [];
+          const dom = new JSDOM(data);
+          const doc = dom.window.document;
           const rows = doc.querySelectorAll('.t_row');
+          const faqIds: string[] = [];
 
-          rows.forEach(row => {
-            const rowElement = row as HTMLElement;
-            const linkValueInput = rowElement.querySelector('input.link_value') as HTMLInputElement;
-            if (!linkValueInput?.value) return;
+          rows.forEach((row) => {
+            const linkValueInput = row.querySelector('input.link_value') as any;
+            if (!linkValueInput?.value) {
+              return;
+            }
 
+            // "/yugiohdb/faq_search.action?ope=5&fid=115&keyword=&tag=-1" から fid を抽出
             const match = linkValueInput.value.match(/[?&]fid=(\d+)/);
             if (match && match[1]) {
               faqIds.push(match[1]);
@@ -114,14 +247,10 @@ function fetchFaqIdListFromPage(page: number, cookieJar: string): Promise<string
 
           resolve(faqIds);
         } catch (error) {
-          console.error(`  パースエラー (ページ ${page}):`, error);
-          resolve([]);
+          reject(error);
         }
       });
-    }).on('error', (error) => {
-      console.error(`  リクエストエラー (ページ ${page}):`, error);
-      resolve([]);
-    });
+    }).on('error', reject);
   });
 }
 
@@ -134,81 +263,57 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
   let totalFetched = 0;
   let page = 1;
   let shouldStop = false;
-  let updatedCount = 0;
-  let consecutiveExisting = 0; // 連続で既存FAQを検出した回数
-  const STOP_THRESHOLD = 5; // 連続5件で停止
 
-  console.log('\n=== FAQ増分取得開始 ===\n');
+  console.log('既存FAQ数:', existingFaqs.size);
+  console.log('\n増分取得を開始します...\n');
 
   while (!shouldStop) {
     console.log(`ページ ${page} を処理中...`);
 
-    const faqIds = await fetchFaqIdListFromPage(page, cookieJar);
+    try {
+      const faqIds = await fetchFaqListPage(page, cookieJar);
 
-    if (faqIds.length === 0) {
-      console.log('  FAQが見つかりませんでした。終了します。');
-      break;
-    }
-
-    console.log(`  ${faqIds.length} 件のFAQ IDを取得`);
-    totalFetched += faqIds.length;
-
-    // 各FAQをチェック
-    let newInPage = 0;
-    for (const faqId of faqIds) {
-      // 詳細を取得
-      const detail = await fetchFaqDetail(faqId, cookieJar);
-
-      if (!detail) {
-        await sleep(CONFIG.DELAY_MS);
-        continue;
-      }
-
-      if (existingFaqs.has(faqId)) {
-        const existingDate = existingFaqs.get(faqId) || '';
-        const newDate = detail.updatedAt || '';
-
-        if (newDate <= existingDate) {
-          // 既存データと同じか古い → カウント
-          consecutiveExisting++;
-          console.log(`  既存FAQ検出 (${consecutiveExisting}/${STOP_THRESHOLD}): faqId=${faqId} (更新日時: ${existingDate})`);
-
-          if (consecutiveExisting >= STOP_THRESHOLD) {
-            console.log(`  連続${STOP_THRESHOLD}件の既存FAQを検出。停止します。`);
-            stoppedAt = faqId;
-            shouldStop = true;
-            break;
-          }
-        } else {
-          // 更新されている → 取得してカウンターをリセット
-          console.log(`  FAQ更新検出: faqId=${faqId} (${existingDate} → ${newDate})`);
-          newFaqs.push(detail);
-          updatedCount++;
-          newInPage++;
-          consecutiveExisting = 0; // リセット
-          process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
-        }
-      } else {
-        // 新規FAQ → カウンターをリセット
-        newFaqs.push(detail);
-        newInPage++;
-        consecutiveExisting = 0; // リセット
-        process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
-      }
-
-      await sleep(CONFIG.DELAY_MS);
-    }
-
-    console.log(`\n  新規+更新FAQ: ${newInPage} 件 (新規: ${newInPage - updatedCount}, 更新: ${updatedCount})`);
-
-    if (!shouldStop) {
-      if (faqIds.length < CONFIG.RESULTS_PER_PAGE) {
-        console.log('  最終ページに到達しました。');
+      if (faqIds.length === 0) {
+        console.log('  FAQが見つかりませんでした。終了します。');
         break;
       }
 
-      page++;
-      await sleep(CONFIG.DELAY_MS);
+      console.log(`  ${faqIds.length} 件のFAQ IDを取得`);
+      totalFetched += faqIds.length;
+
+      // 各FAQ IDをチェック
+      let newInPage = 0;
+      for (const faqId of faqIds) {
+        if (existingFaqs.has(faqId)) {
+          console.log(`  既存FAQ検出: ${faqId}`);
+          stoppedAt = faqId;
+          shouldStop = true;
+          break;
+        } else {
+          // 詳細を取得
+          const detail = await fetchFaqDetail(faqId, cookieJar);
+          if (detail) {
+            newFaqs.push(detail);
+            newInPage++;
+          }
+          await sleep(CONFIG.DELAY_MS);
+        }
+      }
+
+      console.log(`  新規FAQ: ${newInPage} 件`);
+
+      if (!shouldStop) {
+        if (faqIds.length < CONFIG.RESULTS_PER_PAGE) {
+          console.log('  最終ページに到達しました。');
+          break;
+        }
+        page++;
+        await sleep(CONFIG.DELAY_MS);
+      }
+
+    } catch (error) {
+      console.error(`  エラー: ${error}`);
+      break;
     }
   }
 
@@ -218,6 +323,60 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
     totalFetched,
     pagesProcessed: page
   };
+}
+
+/**
+ * 既存TSVからfaqIdセットを読み込む
+ */
+function loadExistingFaqIds(tsvPath: string): Set<string> {
+  const faqIds = new Set<string>();
+
+  if (!fs.existsSync(tsvPath)) {
+    console.log(`既存TSVファイルが見つかりません: ${tsvPath}`);
+    return faqIds;
+  }
+
+  const content = fs.readFileSync(tsvPath, 'utf8');
+  const lines = content.split('\n');
+
+  // ヘッダーをスキップ
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+
+    const fields = line.split('\t');
+    const faqId = fields[0];
+    if (faqId) {
+      faqIds.add(faqId);
+    }
+  }
+
+  console.log(`既存TSVから ${faqIds.size} 件のfaqIdを読み込みました`);
+  return faqIds;
+}
+
+/**
+ * faqid-all.tsvから全faqIdを読み込む
+ */
+function loadAllFaqIds(faqIdListPath: string): string[] {
+  if (!fs.existsSync(faqIdListPath)) {
+    console.error(`faqid-all.tsvが見つかりません: ${faqIdListPath}`);
+    return [];
+  }
+
+  const content = fs.readFileSync(faqIdListPath, 'utf8');
+  const lines = content.split('\n');
+  const faqIds: string[] = [];
+
+  // ヘッダーをスキップ
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line) {
+      faqIds.push(line);
+    }
+  }
+
+  return faqIds;
 }
 
 /**
@@ -404,33 +563,7 @@ function updateTsvWithFaqs(faqs: FaqInfo[], tsvPath: string): void {
 
 async function main() {
   const args = process.argv.slice(2);
-
-  // オプション解析
-  let idsToFetch: string[] = [];
-  let idsFile: string | null = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--ids' && i + 1 < args.length) {
-      idsToFetch = args[i + 1].split(',').map(id => id.trim()).filter(id => id);
-      i++;
-    } else if (args[i] === '--ids-file' && i + 1 < args.length) {
-      idsFile = args[i + 1];
-      i++;
-    }
-  }
-
-  // ファイルからIDを読み込み
-  if (idsFile) {
-    if (!fs.existsSync(idsFile)) {
-      console.error(`ファイルが見つかりません: ${idsFile}`);
-      process.exit(1);
-    }
-    const fileIds = fs.readFileSync(idsFile, 'utf8')
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line);
-    idsToFetch.push(...fileIds);
-  }
+  const mode = parseScrapingMode(args);
 
   const scriptsDir = __dirname;
   const dataDir = path.join(scriptsDir, '../..', 'output', 'data');
@@ -448,11 +581,41 @@ async function main() {
     process.exit(1);
   }
 
-  if (idsToFetch.length > 0) {
+  if (mode.type === 'ids') {
     // 特定IDを取得するモード
-    console.log(`=== FAQ指定ID取得 (${idsToFetch.length}件) ===\n`);
-    const faqs = await fetchSpecificFaqIds(idsToFetch, cookieJar);
+    console.log(`=== FAQ指定ID取得 (${mode.ids.length}件) ===\n`);
+    const faqs = await fetchSpecificFaqIds(mode.ids, cookieJar);
     updateTsvWithFaqs(faqs, tsvPath);
+  } else if (mode.type === 'top') {
+    // 新しい方から件数指定取得モード
+    console.log(`=== FAQ 新しい方から${mode.count}件取得 ===\n`);
+    const faqs = await fetchTopN(mode.count, cookieJar);
+    
+    // 既存データを読み込んでマージ
+    const existingFaqs = loadExistingFaqsWithDate(tsvPath);
+    
+    console.log('\n=== 取得結果 ===');
+    console.log(`取得成功: ${faqs.length}`);
+    
+    if (faqs.length > 0) {
+      console.log('\n=== TSVにマージ中 ===');
+      mergeToTsv(faqs, tsvPath, existingFaqs);
+    }
+  } else if (mode.type === 'range') {
+    // 範囲指定取得モード
+    console.log(`=== FAQ 範囲指定取得 (${mode.start}番目から${mode.length}件) ===\n`);
+    const faqs = await fetchRange(mode.start, mode.length, cookieJar);
+    
+    // 既存データを読み込んでマージ
+    const existingFaqs = loadExistingFaqsWithDate(tsvPath);
+    
+    console.log('\n=== 取得結果 ===');
+    console.log(`取得成功: ${faqs.length}`);
+    
+    if (faqs.length > 0) {
+      console.log('\n=== TSVにマージ中 ===');
+      mergeToTsv(faqs, tsvPath, existingFaqs);
+    }
   } else {
     // 増分取得モード
     console.log('=== FAQ増分取得 ===\n');

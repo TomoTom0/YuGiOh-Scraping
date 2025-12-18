@@ -10,6 +10,10 @@
  *   bun run update:all                # 全て増分取得
  *   bun run update:cards --force-all  # カードデータ全件取得
  *   bun run update:all --force-all    # 全て全件取得
+ *   bun run update:cards --top 10     # カードデータ新しい方から10件
+ *   bun run update:detail --top 10    # 詳細データ新しい方から10件
+ *   bun run update:faq --top 10       # FAQデータ新しい方から10件
+ *   bun run update:cards --range 0 10 # カードデータ0番目から10件
  */
 
 import { spawn } from 'child_process';
@@ -81,9 +85,26 @@ async function runTask(taskKey: string, forceAll: boolean, extraArgs: string[] =
     throw new Error(`Unknown task: ${taskKey}`);
   }
 
+  // モード判定
+  let mode = '増分取得';
+  if (forceAll) {
+    mode = '全件取得';
+  } else if (extraArgs.some(arg => arg.startsWith('--range'))) {
+    const rangeIndex = extraArgs.findIndex(arg => arg === '--range');
+    const start = rangeIndex >= 0 && rangeIndex + 1 < extraArgs.length ? extraArgs[rangeIndex + 1] : '?';
+    const length = rangeIndex >= 0 && rangeIndex + 2 < extraArgs.length ? extraArgs[rangeIndex + 2] : '?';
+    mode = `範囲取得 (${start}番目から${length}件)`;
+  } else if (extraArgs.some(arg => arg.startsWith('--top'))) {
+    const topIndex = extraArgs.findIndex(arg => arg === '--top');
+    const count = topIndex >= 0 && topIndex + 1 < extraArgs.length ? extraArgs[topIndex + 1] : '?';
+    mode = `新しい方から${count}件取得`;
+  } else if (extraArgs.some(arg => arg.startsWith('--ids'))) {
+    mode = '指定ID取得';
+  }
+
   console.log(`\n${'='.repeat(60)}`);
   console.log(`  ${task.name}`);
-  console.log(`  モード: ${forceAll ? '全件取得' : '増分取得'}`);
+  console.log(`  モード: ${mode}`);
   console.log(`${'='.repeat(60)}`);
 
   if (forceAll && task.fullScript) {
@@ -110,11 +131,18 @@ async function main() {
     console.log('  faq    - FAQ情報');
     console.log('  all    - 全てのタスク');
     console.log('\nオプション:');
-    console.log('  --force-all  全件取得モード');
+    console.log('  --force-all           全件取得モード');
+    console.log('  --top N               新しい方からN件取得');
+    console.log('  --range START LENGTH  指定範囲取得（START番目からLENGTH件）');
+    console.log('  --ids ID1,ID2,...     指定IDを取得');
+    console.log('  --ids-file PATH       ファイルから指定IDを取得');
     console.log('\n例:');
     console.log('  bun run update:cards');
     console.log('  bun run update:all');
     console.log('  bun run update:cards --force-all');
+    console.log('  bun run update:cards --top 10');
+    console.log('  bun run update:cards --range 0 10');
+    console.log('  bun run update:detail --ids 12345,67890');
     process.exit(1);
   }
 

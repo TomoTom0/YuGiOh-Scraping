@@ -121,6 +121,38 @@ bun run update:faq
 bun run update:all
 ```
 
+#### 新しい方から件数指定取得
+
+```bash
+# カード基本情報の新しい方から10件取得
+bun run update:cards --top 10
+
+# カード詳細情報の新しい方から10件取得
+bun run update:detail --top 10
+
+# FAQ情報の新しい方から10件取得
+bun run update:faq --top 10
+
+# 全てを新しい方から10件ずつ取得
+bun run update:all --top 10
+```
+
+#### 範囲指定取得
+
+```bash
+# カード基本情報の0番目から10件取得
+bun run update:cards --range 0 10
+
+# カード詳細情報の100番目から50件取得
+bun run update:detail --range 100 50
+
+# FAQ情報の50番目から20件取得
+bun run update:faq --range 50 20
+
+# 全てを0番目から10件ずつ取得
+bun run update:all --range 0 10
+```
+
 #### 全件取得（初回セットアップ時）
 
 ```bash
@@ -168,6 +200,23 @@ bun run src/faq/fetch-faq-from-list.ts --start-from=4000
 | `bun run update:faq` | FAQ情報の増分取得 | 新規FAQ数 × 1秒 |
 | `bun run update:all` | 全データの増分取得 | 上記の合計 |
 
+### 新しい方から件数指定取得（--top N）
+
+| コマンド | 説明 | 所要時間 |
+|---------|------|---------|
+| `bun run update:cards --top 10` | カード基本情報の新しい方から10件 | 数秒 |
+| `bun run update:detail --top 10` | カード詳細情報の新しい方から10件 | 約10秒 |
+| `bun run update:faq --top 10` | FAQ情報の新しい方から10件 | 約10秒 |
+| `bun run update:all --top 10` | 全データの新しい方から10件ずつ | 約30秒 |
+
+### 範囲指定取得（--range START LENGTH）
+
+| コマンド | 説明 | 所要時間 |
+|---------|------|---------|
+| `bun run update:cards --range 0 10` | カード基本情報の0番目から10件 | 数秒 |
+| `bun run update:detail --range 100 50` | カード詳細情報の100番目から50件 | 約50秒 |
+| `bun run update:faq --range 50 20` | FAQ情報の50番目から20件 | 約20秒 |
+
 ### 全件取得コマンド（--force-all）
 
 | コマンド | 説明 | 所要時間 |
@@ -182,6 +231,21 @@ bun run src/faq/fetch-faq-from-list.ts --start-from=4000
 - **cards**: 発売日順（新しい順）でソートし、既存cardIdを検出したら停止
 - **detail**: cards-all.tsvとqa-all.tsvのcardIdを比較し、差分のみ取得
 - **faq**: 更新日時順（新しい順）でソートし、既存faqIdを検出したら停止
+
+### 新しい方から件数指定取得の仕組み（--top N）
+
+- **cards**: 発売日順（新しい順）で先頭からN件を取得してマージ
+- **detail**: cards-all.tsvの先頭（新しい順）からN件のcardIdを取得してマージ  
+- **faq**: 更新日時順（新しい順）で先頭からN件を取得してマージ
+- 既存データがある場合は重複チェックを行い、新規のみ追加または更新
+
+### 範囲指定取得の仕組み（--range START LENGTH）
+
+- **cards**: 発売日順（新しい順）でSTART番目からLENGTH件を取得してマージ
+- **detail**: cards-all.tsvのSTART番目からLENGTH件のcardIdを取得してマージ  
+- **faq**: 更新日時順（新しい順）でSTART番目からLENGTH件を取得してマージ
+- STARTは0から始まるインデックス（0が最新）
+- 既存データがある場合は重複チェックを行い、新規のみ追加または更新
 
 ---
 
@@ -292,6 +356,22 @@ wc -l output/data/faq-all.tsv        # 12578行
 ---
 
 ## 📝 変更履歴
+
+### 2025-12-18 (最新)
+- ✅ **新機能**: 新しい方から件数指定取得機能を追加（`--top N`オプション）
+  - `bun run update:cards --top 10` で最新10件のカードを取得
+  - `bun run update:detail --top 10` で最新10件のカード詳細を取得
+  - `bun run update:faq --top 10` で最新10件のFAQを取得
+- ✅ **新機能**: 範囲指定取得機能を追加（`--range START LENGTH`オプション）
+  - `bun run update:cards --range 0 10` で0番目から10件のカードを取得
+  - `bun run update:detail --range 100 50` で100番目から50件のカード詳細を取得
+  - `bun run update:faq --range 50 20` で50番目から20件のFAQを取得
+- ✅ コマンドライン引数の解析処理を共通化（`src/utils/helpers.ts`）
+- ✅ 4つのスクリプトで統一的なモード切り替えを実装
+  - 増分取得モード（デフォルト）
+  - 新しい方からN件取得モード（`--top N`）
+  - 範囲指定取得モード（`--range START LENGTH`）
+  - 指定ID取得モード（`--ids`, `--ids-file`）
 
 ### 2025-12-18
 - ✅ Bunへ移行

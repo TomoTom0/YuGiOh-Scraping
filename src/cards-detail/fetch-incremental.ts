@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { establishSession } from '../utils/session.js';
 import { fetchCardDetail, type CardDetail } from '../utils/fetchers.js';
 import { escapeForTsv } from '../utils/formatters.js';
-import { sleep } from '../utils/helpers.js';
+import { sleep, parseScrapingMode } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +86,108 @@ function loadAllCardIds(cardsPath: string): string[] {
   }
 
   return cardIds;
+}
+
+/**
+ * 新しい方から指定件数を取得
+ */
+async function fetchTopN(n: number, cardsPath: string, cookieJar: string): Promise<CardDetail[]> {
+  const allCardIds = loadAllCardIds(cardsPath);
+  
+  if (allCardIds.length === 0) {
+    console.error('カードIDが見つかりません。');
+    return [];
+  }
+
+  // 新しい順に並んでいるので、先頭からN件を取得
+  const topCardIds = allCardIds.slice(0, Math.min(n, allCardIds.length));
+  
+  console.log(`新しい方から ${topCardIds.length} 件取得\n`);
+
+  const cards: CardDetail[] = [];
+  let successCount = 0;
+  let errorCount = 0;
+  let supplementCount = 0;
+  let pendulumSupplementCount = 0;
+
+  for (let i = 0; i < topCardIds.length; i++) {
+    const cardId = topCardIds[i];
+    const progress = `[${i + 1}/${topCardIds.length}]`;
+
+    process.stdout.write(`\r${progress} 取得中: ${cardId}...`);
+
+    const cardDetail = await fetchCardDetail(cardId, cookieJar);
+
+    if (cardDetail) {
+      cards.push(cardDetail);
+      successCount++;
+      if (cardDetail.supplementInfo) supplementCount++;
+      if (cardDetail.pendulumSupplementInfo) pendulumSupplementCount++;
+    } else {
+      errorCount++;
+    }
+
+    if (i < topCardIds.length - 1) {
+      await sleep(CONFIG.DELAY_MS);
+    }
+  }
+
+  console.log(`\n\n取得完了: 成功=${successCount}, エラー=${errorCount}`);
+  console.log(`補足情報あり: ${supplementCount}`);
+  console.log(`P補足情報あり: ${pendulumSupplementCount}`);
+
+  return cards;
+}
+
+/**
+ * 指定範囲を取得 (start位置からlength件)
+ */
+async function fetchRange(start: number, length: number, cardsPath: string, cookieJar: string): Promise<CardDetail[]> {
+  const allCardIds = loadAllCardIds(cardsPath);
+  
+  if (allCardIds.length === 0) {
+    console.error('カードIDが見つかりません。');
+    return [];
+  }
+
+  // 範囲を取得
+  const rangeCardIds = allCardIds.slice(start, start + length);
+  
+  console.log(`範囲取得: ${start}番目から${rangeCardIds.length}件 (${start} ~ ${start + rangeCardIds.length - 1})\n`);
+
+  const cards: CardDetail[] = [];
+  let successCount = 0;
+  let errorCount = 0;
+  let supplementCount = 0;
+  let pendulumSupplementCount = 0;
+
+  for (let i = 0; i < rangeCardIds.length; i++) {
+    const cardId = rangeCardIds[i];
+    const progress = `[${i + 1}/${rangeCardIds.length}]`;
+
+    process.stdout.write(`\r${progress} 取得中: ${cardId}...`);
+
+    const cardDetail = await fetchCardDetail(cardId, cookieJar);
+
+    if (cardDetail) {
+      cards.push(cardDetail);
+      successCount++;
+      if (cardDetail.supplementInfo) supplementCount++;
+      if (cardDetail.pendulumSupplementInfo) pendulumSupplementCount++;
+    } else {
+      errorCount++;
+    }
+
+    if (i < rangeCardIds.length - 1) {
+      await sleep(CONFIG.DELAY_MS);
+    }
+  }
+
+  console.log(`\n\n取得完了: 成功=${successCount}, エラー=${errorCount}`);
+  console.log(`補足情報あり: ${supplementCount}`);
+  console.log(`P補足情報あり: ${pendulumSupplementCount}`);
+
+  return cards;
 }
 
 /**
@@ -234,33 +336,7 @@ function updateTsvWithCards(cards: CardDetail[], tsvPath: string): void {
 
 async function main() {
   const args = process.argv.slice(2);
-
-  // オプション解析
-  let idsToFetch: string[] = [];
-  let idsFile: string | null = null;
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--ids' && i + 1 < args.length) {
-      idsToFetch = args[i + 1].split(',').map(id => id.trim()).filter(id => id);
-      i++;
-    } else if (args[i] === '--ids-file' && i + 1 < args.length) {
-      idsFile = args[i + 1];
-      i++;
-    }
-  }
-
-  // ファイルからIDを読み込み
-  if (idsFile) {
-    if (!fs.existsSync(idsFile)) {
-      console.error(`ファイルが見つかりません: ${idsFile}`);
-      process.exit(1);
-    }
-    const fileIds = fs.readFileSync(idsFile, 'utf8')
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line);
-    idsToFetch.push(...fileIds);
-  }
+  const mode = parseScrapingMode(args);
 
   const scriptsDir = __dirname;
   const dataDir = path.join(scriptsDir, '../..', 'output', 'data');
@@ -279,11 +355,21 @@ async function main() {
     process.exit(1);
   }
 
-  if (idsToFetch.length > 0) {
+  if (mode.type === 'ids') {
     // 特定IDを取得するモード
-    console.log(`=== カード指定ID取得 (${idsToFetch.length}件) ===\n`);
-    const cards = await fetchSpecificCardIds(idsToFetch, cookieJar);
+    console.log(`=== カード指定ID取得 (${mode.ids.length}件) ===\n`);
+    const cards = await fetchSpecificCardIds(mode.ids, cookieJar);
     updateTsvWithCards(cards, tsvPath);
+  } else if (mode.type === 'top') {
+    // 新しい方から件数指定取得モード
+    console.log(`=== カード詳細 新しい方から${mode.count}件取得 ===\n`);
+    const cards = await fetchTopN(mode.count, cardsPath, cookieJar);
+    mergeToTsv(cards, tsvPath);
+  } else if (mode.type === 'range') {
+    // 範囲指定取得モード
+    console.log(`=== カード詳細 範囲指定取得 (${mode.start}番目から${mode.length}件) ===\n`);
+    const cards = await fetchRange(mode.start, mode.length, cardsPath, cookieJar);
+    mergeToTsv(cards, tsvPath);
   } else {
     // 増分取得モード
     console.log('=== cards-detail増分取得 ===\n');
