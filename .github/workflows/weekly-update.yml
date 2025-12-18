@@ -33,7 +33,7 @@ jobs:
           mkdir -p output/data
           
           # 最新リリースのタグを取得
-          LATEST_TAG=$(gh release list --limit 1 --json tag -q '.[0].tag')
+          LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
           
           if [ -z "$LATEST_TAG" ]; then
             echo "❌ エラー: 前回リリースが見つかりません"
@@ -121,7 +121,7 @@ jobs:
           echo "=== 古いリリースを削除 ==="
           
           # リリースタグを取得（新しい順）
-          RELEASES=$(gh release list --limit 100 --json tag -q '.[].tag')
+          RELEASES=$(gh release list --limit 100 --json tagName -q '.[].tagName')
           
           # 配列に変換
           readarray -t RELEASE_ARRAY <<< "$RELEASES"
