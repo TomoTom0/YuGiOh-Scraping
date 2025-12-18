@@ -67,3 +67,4 @@ Thumbs.db
 yarn.lock
 tmp/
 output/
+output/data/*.backup
