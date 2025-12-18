@@ -108,11 +108,21 @@ jobs:
           - ソート順: ID降順（新しいものが先頭）
           EOF
           
-          # リリース作成
-          gh release create "${RELEASE_TAG}" \
-            "${ARCHIVE_NAME}" \
-            --title "遊戯王データ ${RELEASE_TAG}" \
-            --notes-file release-notes.md
+          # 既存のリリースがあるか確認
+          if gh release view "${RELEASE_TAG}" 2>/dev/null; then
+            echo "既存のリリースを更新します: ${RELEASE_TAG}"
+            # 既存のアセットを削除
+            gh release delete-asset "${RELEASE_TAG}" "ygo-data-${RELEASE_TAG}.tar.gz" 2>/dev/null || true
+            # 新しいアセットをアップロード
+            gh release upload "${RELEASE_TAG}" "${ARCHIVE_NAME}"
+          else
+            echo "新しいリリースを作成します: ${RELEASE_TAG}"
+            # リリース作成
+            gh release create "${RELEASE_TAG}" \
+              "${ARCHIVE_NAME}" \
+              --title "遊戯王データ ${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          fi
 
       - name: Keep only latest 3 releases
         env:
