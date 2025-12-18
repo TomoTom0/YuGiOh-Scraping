@@ -45,14 +45,14 @@ interface FetchResult {
 // ============================================================================
 
 /**
- * 既存TSVからfaqIdセットを読み込む
+ * 既存TSVからfaqIdと更新日時のマップを読み込む
  */
-function loadExistingFaqIds(tsvPath: string): Set<string> {
-  const faqIds = new Set<string>();
+function loadExistingFaqsWithDate(tsvPath: string): Map<string, string> {
+  const faqMap = new Map<string, string>();
 
   if (!fs.existsSync(tsvPath)) {
     console.log(`既存TSVファイルが見つかりません: ${tsvPath}`);
-    return faqIds;
+    return faqMap;
   }
 
   const content = fs.readFileSync(tsvPath, 'utf8');
@@ -65,13 +65,14 @@ function loadExistingFaqIds(tsvPath: string): Set<string> {
 
     const fields = line.split('\t');
     const faqId = fields[0]; // faqIdは1番目のフィールド
+    const updatedAt = fields[3] || ''; // updatedAtは4番目のフィールド
     if (faqId) {
-      faqIds.add(faqId);
+      faqMap.set(faqId, updatedAt);
     }
   }
 
-  console.log(`既存TSVから ${faqIds.size} 件のfaqIdを読み込みました`);
-  return faqIds;
+  console.log(`既存TSVから ${faqMap.size} 件のfaqIdを読み込みました`);
+  return faqMap;
 }
 
 /**
@@ -127,12 +128,13 @@ function fetchFaqIdListFromPage(page: number, cookieJar: string): Promise<string
 /**
  * 増分取得を実行
  */
-async function fetchIncremental(existingFaqIds: Set<string>, cookieJar: string): Promise<FetchResult> {
+async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: string): Promise<FetchResult> {
   const newFaqs: FaqInfo[] = [];
   let stoppedAt: string | null = null;
   let totalFetched = 0;
   let page = 1;
   let shouldStop = false;
+  let updatedCount = 0;
 
   console.log('\n=== FAQ増分取得開始 ===\n');
 
@@ -152,25 +154,43 @@ async function fetchIncremental(existingFaqIds: Set<string>, cookieJar: string):
     // 各FAQをチェック
     let newInPage = 0;
     for (const faqId of faqIds) {
-      if (existingFaqIds.has(faqId)) {
-        console.log(`  既存FAQ検出: faqId=${faqId}`);
-        stoppedAt = faqId;
-        shouldStop = true;
-        break;
-      }
-
       // 詳細を取得
       const detail = await fetchFaqDetail(faqId, cookieJar);
-      if (detail) {
+
+      if (!detail) {
+        await sleep(CONFIG.DELAY_MS);
+        continue;
+      }
+
+      if (existingFaqs.has(faqId)) {
+        const existingDate = existingFaqs.get(faqId) || '';
+        const newDate = detail.updatedAt || '';
+
+        if (newDate <= existingDate) {
+          // 既存データと同じか古い → 停止
+          console.log(`  既存FAQ検出: faqId=${faqId} (更新日時: ${existingDate})`);
+          stoppedAt = faqId;
+          shouldStop = true;
+          break;
+        } else {
+          // 更新されている → 取得
+          console.log(`  FAQ更新検出: faqId=${faqId} (${existingDate} → ${newDate})`);
+          newFaqs.push(detail);
+          updatedCount++;
+          newInPage++;
+          process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
+        }
+      } else {
+        // 新規FAQ
         newFaqs.push(detail);
         newInPage++;
-        process.stdout.write(`\r  新規FAQ取得中: ${newInPage} 件...`);
+        process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
       }
 
       await sleep(CONFIG.DELAY_MS);
     }
 
-    console.log(`\n  新規FAQ: ${newInPage} 件`);
+    console.log(`\n  新規+更新FAQ: ${newInPage} 件 (新規: ${newInPage - updatedCount}, 更新: ${updatedCount})`);
 
     if (!shouldStop) {
       if (faqIds.length < CONFIG.RESULTS_PER_PAGE) {
@@ -227,39 +247,90 @@ async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise
 }
 
 /**
- * 新規FAQを既存TSVにマージ（先頭に追加）
+ * 新規・更新FAQを既存TSVにマージ
+ * - 更新されたFAQは既存データを置換
+ * - 新規FAQは先頭に追加
  */
-function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string): void {
+function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string, existingFaqs: Map<string, string>): void {
   if (newFaqs.length === 0) {
     console.log('マージするFAQがありません。');
     return;
   }
 
-  // 新規FAQをTSV行に変換
-  const newLines = newFaqs.map(faq => [
-    faq.faqId,
-    escapeForTsv(faq.question),
-    escapeForTsv(faq.answer),
-    escapeForTsv(faq.updatedAt)
-  ].join('\t'));
-
   if (!fs.existsSync(tsvPath)) {
     // TSVファイルが存在しない場合は新規作成
     const header = ['faqId', 'question', 'answer', 'updatedAt'].join('\t');
+    const newLines = newFaqs.map(faq => [
+      faq.faqId,
+      escapeForTsv(faq.question),
+      escapeForTsv(faq.answer),
+      escapeForTsv(faq.updatedAt)
+    ].join('\t'));
     fs.writeFileSync(tsvPath, header + '\n' + newLines.join('\n'), 'utf8');
     console.log(`新規TSVファイルを作成しました: ${tsvPath}`);
-  } else {
-    // 既存TSVの先頭（ヘッダーの後）に新規FAQを追加
-    const existingContent = fs.readFileSync(tsvPath, 'utf8');
-    const lines = existingContent.split('\n');
-    const header = lines[0];
-    const existingData = lines.slice(1).filter(line => line.trim());
-
-    const mergedLines = [header, ...newLines, ...existingData];
-    fs.writeFileSync(tsvPath, mergedLines.join('\n'), 'utf8');
-
-    console.log(`${newFaqs.length} 件の新規FAQをTSVに追加しました`);
+    return;
   }
+
+  // 既存TSVを読み込み
+  const existingContent = fs.readFileSync(tsvPath, 'utf8');
+  const lines = existingContent.split('\n');
+  const header = lines[0];
+
+  // 既存データをMapに変換
+  const faqMap = new Map<string, string>();
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    const faqId = line.split('\t')[0];
+    if (faqId) {
+      faqMap.set(faqId, line);
+    }
+  }
+
+  // 新規・更新FAQを処理
+  const newFaqIds: string[] = [];
+  let updatedCount = 0;
+
+  for (const faq of newFaqs) {
+    const newLine = [
+      faq.faqId,
+      escapeForTsv(faq.question),
+      escapeForTsv(faq.answer),
+      escapeForTsv(faq.updatedAt)
+    ].join('\t');
+
+    if (existingFaqs.has(faq.faqId)) {
+      // 既存FAQを更新
+      faqMap.set(faq.faqId, newLine);
+      updatedCount++;
+    } else {
+      // 新規FAQ（先頭に追加するためIDを記録）
+      newFaqIds.push(faq.faqId);
+      faqMap.set(faq.faqId, newLine);
+    }
+  }
+
+  // TSVを再構築（新規FAQを先頭に）
+  const mergedLines = [header];
+
+  // 新規FAQを先頭に追加
+  for (const faqId of newFaqIds) {
+    const line = faqMap.get(faqId);
+    if (line) {
+      mergedLines.push(line);
+      faqMap.delete(faqId);
+    }
+  }
+
+  // 既存FAQ（更新含む）を追加
+  for (const [faqId, line] of faqMap.entries()) {
+    mergedLines.push(line);
+  }
+
+  fs.writeFileSync(tsvPath, mergedLines.join('\n'), 'utf8');
+
+  const newCount = newFaqIds.length;
+  console.log(`${newFaqs.length} 件をTSVに反映しました (新規: ${newCount}, 更新: ${updatedCount})`);
 }
 
 /**
@@ -377,16 +448,16 @@ async function main() {
     // 増分取得モード
     console.log('=== FAQ増分取得 ===\n');
 
-    // 既存faqIdを読み込み
-    const existingFaqIds = loadExistingFaqIds(tsvPath);
+    // 既存faqIdと更新日時を読み込み
+    const existingFaqs = loadExistingFaqsWithDate(tsvPath);
 
     // 増分取得実行
-    const result = await fetchIncremental(existingFaqIds, cookieJar);
+    const result = await fetchIncremental(existingFaqs, cookieJar);
 
     console.log('\n=== 取得結果 ===');
     console.log(`処理ページ数: ${result.pagesProcessed}`);
     console.log(`取得FAQ ID総数: ${result.totalFetched}`);
-    console.log(`新規FAQ数: ${result.newFaqs.length}`);
+    console.log(`新規+更新FAQ数: ${result.newFaqs.length}`);
     if (result.stoppedAt) {
       console.log(`停止位置 (既存faqId): ${result.stoppedAt}`);
     }
@@ -394,7 +465,7 @@ async function main() {
     // マージ
     if (result.newFaqs.length > 0) {
       console.log('\n=== TSVにマージ中 ===');
-      mergeToTsv(result.newFaqs, tsvPath);
+      mergeToTsv(result.newFaqs, tsvPath, existingFaqs);
     }
   }
 
