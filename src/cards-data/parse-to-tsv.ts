@@ -701,7 +701,7 @@ async function main() {
   console.log('=== Starting TSV generation ===\n');
 
   const cardsDir = path.join(__dirname, 'cards');
-  const outputDir = path.join(__dirname, '..', 'output');
+  const outputDir = path.join(__dirname, '../..', 'output', 'data');
   const outputPath = path.join(outputDir, 'cards-all.tsv');
 
   // 出力ディレクトリを作成

@@ -1,128 +1,12 @@
-import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { fetchCardDetail } from '../utils/fetchers.js';
+import { escapeForTsv } from '../utils/formatters.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * TSV用にエスケープ
- */
-function escapeForTsv(value: string | undefined): string {
-  if (!value) return '';
-  // タブ、改行、キャリッジリターンを置換
-  return value
-    .replace(/\t/g, '\\t')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r');
-}
-
-/**
- * 待機
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * QAページから補足情報を取得
- */
-async function fetchQAPage(cardId: string, cookieJar: string): Promise<{
-  cardId: string;
-  cardName: string;
-  supplementInfo?: string;
-  supplementDate?: string;
-  pendulumSupplementInfo?: string;
-  pendulumSupplementDate?: string;
-} | null> {
-  const url = `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=${cardId}&request_locale=ja`;
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookieJar
-      }
-    }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
-      res.on('end', () => {
-        try {
-          const dom = new JSDOM(html, { url });
-          const doc = dom.window.document as unknown as Document;
-
-          // タイトルからカード名を抽出
-          const titleElem = doc.querySelector('title');
-          const title = titleElem?.textContent || '';
-          const cardName = title.split('|')[0]?.trim() || '';
-
-          // 補足情報を取得
-          let supplementInfo: string | undefined = undefined;
-          let supplementDate: string | undefined = undefined;
-          let pendulumSupplementInfo: string | undefined = undefined;
-          let pendulumSupplementDate: string | undefined = undefined;
-
-          const supplementElems = doc.querySelectorAll('.supplement');
-
-          supplementElems.forEach(supplementElem => {
-            const textElem = supplementElem.querySelector('.text');
-            if (!textElem) return;
-
-            const textId = textElem.id;
-
-            // 日付を取得
-            const dateElem = supplementElem.querySelector('.title .update');
-            const date = dateElem?.textContent?.trim() || undefined;
-
-            // テキストを取得（改行を保持、カードリンクをテンプレート形式に変換）
-            const cloned = textElem.cloneNode(true) as HTMLElement;
-            cloned.querySelectorAll('br').forEach(br => {
-              br.replaceWith('\n');
-            });
-
-            // カードリンクを{{カード名|cid}}形式に変換
-            cloned.querySelectorAll('a[href*="cid="]').forEach(link => {
-              const href = link.getAttribute('href') || '';
-              const match = href.match(/[?&]cid=(\d+)/);
-              if (match && match[1]) {
-                const linkCardId = match[1];
-                const cardLinkName = link.textContent?.trim() || '';
-                link.replaceWith(`{{${cardLinkName}|${linkCardId}}}`);
-              }
-            });
-
-            const text = cloned.textContent?.trim() || undefined;
-
-            // IDで判別
-            if (textId === 'pen_supplement') {
-              pendulumSupplementInfo = text;
-              pendulumSupplementDate = date;
-            } else if (textId === 'supplement') {
-              supplementInfo = text;
-              supplementDate = date;
-            }
-          });
-
-          resolve({
-            cardId,
-            cardName,
-            supplementInfo,
-            supplementDate,
-            pendulumSupplementInfo,
-            pendulumSupplementDate
-          });
-        } catch (error) {
-          console.error(`Parse error for card ${cardId}:`, error);
-          resolve(null);
-        }
-      });
-    }).on('error', (error) => {
-      console.error(`Request error for card ${cardId}:`, error);
-      resolve(null);
-    });
-  });
-}
 
 /**
  * メイン処理
@@ -143,31 +27,16 @@ async function main() {
     }
   }
 
-  // セッション確立用のCookieを取得
-  console.log('Loading cookies...');
-  const cookiesPath = path.join(__dirname, '..', 'config', 'cookies.txt');
-  let cookieJar = '';
-
-  if (fs.existsSync(cookiesPath)) {
-    const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-    const cookies: string[] = [];
-    cookieLines.forEach(line => {
-      if (line.startsWith('#') || line.trim() === '') return;
-      const parts = line.split('\t');
-      if (parts.length >= 7) {
-        cookies.push(`${parts[5]}=${parts[6]}`);
-      }
-    });
-    cookieJar = cookies.join('; ');
-    console.log('✓ Cookies loaded\n');
-  } else {
-    console.error('✗ cookies.txt not found');
+  // セッション確立
+  const cookieJar = await establishSession();
+  if (!cookieJar) {
+    console.error('✗ セッションの確立に失敗しました');
     process.exit(1);
   }
 
   // cards-all.tsvからcardIdを読み込む
   console.log('Reading cards-all.tsv...');
-  const cardsPath = path.join(__dirname, '..', 'input', 'cards-all.tsv');
+  const cardsPath = path.join(__dirname, '../..', 'output', 'data', 'cards-all.tsv');
   const cardsContent = fs.readFileSync(cardsPath, 'utf8');
   const lines = cardsContent.split('\n');
 
@@ -198,14 +67,14 @@ async function main() {
     console.log(`⚠️ Resume mode: Starting from index ${startFrom}\n`);
 
     // 最新の中間ファイルを検索して読み込む
-    const tempDir = path.join(__dirname, '..', 'temp');
+    const tempDir = path.join(__dirname, '../..', 'output', '.temp', 'cards-detail');
     let latestTempFile: string | null = null;
     let maxIndex = 0;
 
     if (fs.existsSync(tempDir)) {
-      const tempFiles = fs.readdirSync(tempDir).filter(f => f.match(/^qa-all-temp-\d+\.tsv$/));
+      const tempFiles = fs.readdirSync(tempDir).filter(f => f.match(/^details-all-temp-\d+\.tsv$/));
       for (const file of tempFiles) {
-        const match = file.match(/qa-all-temp-(\d+)\.tsv/);
+        const match = file.match(/details-all-temp-(\d+)\.tsv/);
         if (match) {
           const index = parseInt(match[1], 10);
           if (index <= startFrom && index > maxIndex) {
@@ -259,7 +128,7 @@ async function main() {
   }
 
   // 出力ファイルのパス
-  const outputPath = path.join(__dirname, '..', 'output', 'qa-all.tsv');
+  const outputPath = path.join(__dirname, '../..', 'output', 'data', 'details-all.tsv');
   console.log(`Output file: ${outputPath}\n`);
 
   const startTime = Date.now();
@@ -282,7 +151,7 @@ async function main() {
       process.stdout.write(`\r${progress} Fetching: ${cardId}...`);
     }
 
-    const qaData = await fetchQAPage(cardId, cookieJar);
+    const qaData = await fetchCardDetail(cardId, cookieJar);
 
     if (qaData) {
       tsvLines.push([
@@ -308,7 +177,11 @@ async function main() {
 
     // 1000件ごとに中間ファイルを保存（エラー時の復旧用）
     if ((i + 1) % 1000 === 0) {
-      const tempPath = path.join(__dirname, '..', 'temp', `qa-all-temp-${i + 1}.tsv`);
+      const tempDir = path.join(__dirname, '../..', 'output', '.temp', 'cards-detail');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const tempPath = path.join(tempDir, `details-all-temp-${i + 1}.tsv`);
       fs.writeFileSync(tempPath, tsvLines.join('\n'), 'utf8');
       console.log(`  📁 Saved checkpoint: ${path.basename(tempPath)}`);
     }

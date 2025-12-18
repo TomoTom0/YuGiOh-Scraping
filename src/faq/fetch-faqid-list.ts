@@ -3,15 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * 待機
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 /**
  * QA一覧ページからfaqIdリストを取得
@@ -26,9 +21,10 @@ async function fetchFaqIdListFromPage(page: number, rp: number, cookieJar: strin
         'Cookie': cookieJar
       }
     }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => { chunks.push(chunk); });
       res.on('end', () => {
+        const html = Buffer.concat(chunks).toString('utf8');
         try {
           const dom = new JSDOM(html, { url });
           const doc = dom.window.document as unknown as Document;
@@ -72,25 +68,10 @@ async function fetchFaqIdListFromPage(page: number, rp: number, cookieJar: strin
 async function main() {
   console.log('=== Fetching All FAQ IDs from FAQ List ===\n');
 
-  // セッション確立用のCookieを取得
-  console.log('Loading cookies...');
-  const cookiesPath = path.join(__dirname, 'cookies.txt');
-  let cookieJar = '';
-
-  if (fs.existsSync(cookiesPath)) {
-    const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-    const cookies: string[] = [];
-    cookieLines.forEach(line => {
-      if (line.startsWith('#') || line.trim() === '') return;
-      const parts = line.split('\t');
-      if (parts.length >= 7) {
-        cookies.push(`${parts[5]}=${parts[6]}`);
-      }
-    });
-    cookieJar = cookies.join('; ');
-    console.log('✓ Cookies loaded\n');
-  } else {
-    console.error('✗ cookies.txt not found');
+  // セッション確立
+  const cookieJar = await establishSession();
+  if (!cookieJar) {
+    console.error('✗ セッションの確立に失敗しました');
     process.exit(1);
   }
 
@@ -142,7 +123,11 @@ async function main() {
   }
 
   // TSVファイルに書き込み（1列のみ）
-  const outputPath = path.join(__dirname, 'faqid-all.tsv');
+  const dataDir = path.join(__dirname, '../..', 'output', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  const outputPath = path.join(dataDir, 'faqid-all.tsv');
   console.log(`\n\nWriting FAQ IDs to ${outputPath}...`);
 
   const tsvLines: string[] = [];

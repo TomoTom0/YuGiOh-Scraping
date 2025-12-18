@@ -1,122 +1,12 @@
-import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { fetchFaqDetail } from '../utils/fetchers.js';
+import { escapeForTsv } from '../utils/formatters.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * TSV用にエスケープ
- */
-function escapeForTsv(value: string | undefined): string {
-  if (!value) return '';
-  // タブ、改行、キャリッジリターンを置換
-  return value
-    .replace(/\t/g, '\\t')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r');
-}
-
-/**
- * 待機
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * HTMLElement内のカードリンクを {{カード名|cid}} 形式のテンプレートに変換
- */
-function convertCardLinksToTemplate(element: HTMLElement): string {
-  const cloned = element.cloneNode(true) as HTMLElement;
-
-  // <br>を改行に変換
-  cloned.querySelectorAll('br').forEach(br => {
-    br.replaceWith('\n');
-  });
-
-  // カードリンク <a href="...?cid=5533">カード名</a> を {{カード名|5533}} に変換
-  cloned.querySelectorAll('a[href*="cid="]').forEach(link => {
-    const href = link.getAttribute('href') || '';
-    const match = href.match(/[?&]cid=(\d+)/);
-    if (match && match[1]) {
-      const cardId = match[1];
-      const cardName = link.textContent?.trim() || '';
-      // {{カード名|cid}} 形式に変換
-      link.replaceWith(`{{${cardName}|${cardId}}}`);
-    }
-  });
-
-  return cloned.textContent?.trim() || '';
-}
-
-/**
- * 個別FAQ詳細を取得
- */
-async function fetchFaqDetail(faqId: string, cookieJar: string): Promise<{
-  faqId: string;
-  question: string;
-  answer: string;
-  updatedAt?: string;
-} | null> {
-  const url = `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=5&fid=${faqId}&request_locale=ja`;
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookieJar
-      }
-    }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
-      res.on('end', () => {
-        try {
-          const dom = new JSDOM(html, { url });
-          const doc = dom.window.document as unknown as Document;
-
-          // 質問文を取得（#question_text から）カードリンクをテンプレート形式に変換
-          const questionElem = doc.querySelector('#question_text');
-          if (!questionElem) {
-            resolve(null);
-            return;
-          }
-          const question = convertCardLinksToTemplate(questionElem as HTMLElement);
-
-          if (!question) {
-            resolve(null);
-            return;
-          }
-
-          // 回答を取得（#answer_text から）カードリンクをテンプレート形式に変換
-          const answerElem = doc.querySelector('#answer_text');
-          let answer = '';
-          if (answerElem) {
-            answer = convertCardLinksToTemplate(answerElem as HTMLElement);
-          }
-
-          // 更新日を取得（オプション）
-          const dateElem = doc.querySelector('#tag_update .date');
-          const updatedAt = dateElem?.textContent?.trim() || undefined;
-
-          resolve({
-            faqId,
-            question,
-            answer,
-            updatedAt
-          });
-        } catch (error) {
-          console.error(`Parse error for FAQ ${faqId}:`, error);
-          resolve(null);
-        }
-      });
-    }).on('error', (error) => {
-      console.error(`Request error for FAQ ${faqId}:`, error);
-      resolve(null);
-    });
-  });
-}
 
 /**
  * メイン処理
@@ -137,31 +27,16 @@ async function main() {
     }
   }
 
-  // セッション確立用のCookieを取得
-  console.log('Loading cookies...');
-  const cookiesPath = path.join(__dirname, '..', 'config', 'cookies.txt');
-  let cookieJar = '';
-
-  if (fs.existsSync(cookiesPath)) {
-    const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-    const cookies: string[] = [];
-    cookieLines.forEach(line => {
-      if (line.startsWith('#') || line.trim() === '') return;
-      const parts = line.split('\t');
-      if (parts.length >= 7) {
-        cookies.push(`${parts[5]}=${parts[6]}`);
-      }
-    });
-    cookieJar = cookies.join('; ');
-    console.log('✓ Cookies loaded\n');
-  } else {
-    console.error('✗ cookies.txt not found');
+  // セッション確立
+  const cookieJar = await establishSession();
+  if (!cookieJar) {
+    console.error('✗ セッションの確立に失敗しました');
     process.exit(1);
   }
 
   // faqIdリストを読み込む
   console.log('Reading faqid-all.tsv...');
-  const faqIdListPath = path.join(__dirname, '..', 'output', 'faqid-all.tsv');
+  const faqIdListPath = path.join(__dirname, '../..', 'output', 'data', 'faqid-all.tsv');
   const faqIdContent = fs.readFileSync(faqIdListPath, 'utf8');
   const lines = faqIdContent.split('\n');
 
@@ -184,7 +59,7 @@ async function main() {
     console.log(`⚠️ Resume mode: Starting from index ${startFrom}\n`);
 
     // 最新の中間ファイルを検索して読み込む
-    const tempDir = path.join(__dirname, '..', 'temp');
+    const tempDir = path.join(__dirname, '../..', 'output', '.temp', 'faq');
     let latestTempFile: string | null = null;
     let maxIndex = 0;
 
@@ -235,7 +110,7 @@ async function main() {
   }
 
   // 出力ファイルのパス
-  const outputPath = path.join(__dirname, '..', 'output', 'faq-all.tsv');
+  const outputPath = path.join(__dirname, '../..', 'output', 'data', 'faq-all.tsv');
   console.log(`Output file: ${outputPath}\n`);
 
   const startTime = Date.now();
@@ -281,7 +156,11 @@ async function main() {
 
     // 1000件ごとに中間ファイルを保存（エラー時の復旧用）
     if ((i + 1) % 1000 === 0) {
-      const tempPath = path.join(__dirname, '..', 'temp', `faq-all-temp-${i + 1}.tsv`);
+      const tempDir = path.join(__dirname, '../..', 'output', '.temp', 'faq');
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+      const tempPath = path.join(tempDir, `faq-all-temp-${i + 1}.tsv`);
       fs.writeFileSync(tempPath, tsvLines.join('\n'), 'utf8');
       console.log(`\n  📁 Saved checkpoint: ${path.basename(tempPath)} (${successCount} FAQs)`);
     }

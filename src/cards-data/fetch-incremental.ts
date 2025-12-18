@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseSearchResultRow, extractImageInfo } from './parse-to-tsv';
+import { parseScrapingMode, type ScrapingMode } from '../utils/helpers.js';
 
 // ============================================================================
 // 設定
@@ -109,6 +110,137 @@ function parseCardsFromHtml(html: string): CardInfo[] {
   });
 
   return cards;
+}
+
+/**
+ * 新しい方から指定件数を取得
+ */
+async function fetchTopN(n: number): Promise<FetchResult> {
+  const newCards: CardInfo[] = [];
+  let totalFetched = 0;
+  let page = 1;
+
+  console.log(`新しい方から ${n} 件取得\n`);
+
+  while (newCards.length < n) {
+    console.log(`ページ ${page} を処理中...`);
+
+    try {
+      const html = await fetchPage(page);
+      const cards = parseCardsFromHtml(html);
+
+      if (cards.length === 0) {
+        console.log('  カードが見つかりませんでした。終了します。');
+        break;
+      }
+
+      console.log(`  ${cards.length} 件のカードを取得`);
+      totalFetched += cards.length;
+
+      // 必要な件数まで追加
+      const remaining = n - newCards.length;
+      const toAdd = cards.slice(0, remaining);
+      newCards.push(...toAdd);
+
+      console.log(`  追加: ${toAdd.length} 件 (合計: ${newCards.length}/${n})`);
+
+      if (newCards.length >= n) {
+        break;
+      }
+
+      // 次のページがあるかチェック
+      if (cards.length < CONFIG.RESULTS_PER_PAGE) {
+        console.log('  最終ページに到達しました。');
+        break;
+      }
+
+      page++;
+      await sleep(CONFIG.DELAY_MS);
+
+    } catch (error) {
+      console.error(`  エラー: ${error}`);
+      break;
+    }
+  }
+
+  return {
+    newCards,
+    stoppedAt: null,
+    totalFetched,
+    pagesProcessed: page
+  };
+}
+
+/**
+ * 指定範囲を取得 (start位置からlength件)
+ */
+async function fetchRange(start: number, length: number): Promise<FetchResult> {
+  const newCards: CardInfo[] = [];
+  let totalFetched = 0;
+  let currentIndex = 0;
+  let page = 1;
+
+  console.log(`範囲取得: ${start}番目から${length}件 (${start} ~ ${start + length - 1})\n`);
+
+  while (newCards.length < length) {
+    console.log(`ページ ${page} を処理中...`);
+
+    try {
+      const html = await fetchPage(page);
+      const cards = parseCardsFromHtml(html);
+
+      if (cards.length === 0) {
+        console.log('  カードが見つかりませんでした。終了します。');
+        break;
+      }
+
+      console.log(`  ${cards.length} 件のカードを取得`);
+      totalFetched += cards.length;
+
+      // 各カードをチェック
+      for (const card of cards) {
+        // start位置より前はスキップ
+        if (currentIndex < start) {
+          currentIndex++;
+          continue;
+        }
+
+        // 必要な件数に達したら終了
+        if (newCards.length >= length) {
+          break;
+        }
+
+        newCards.push(card);
+        currentIndex++;
+      }
+
+      console.log(`  追加: (合計: ${newCards.length}/${length})`);
+
+      if (newCards.length >= length) {
+        break;
+      }
+
+      // 次のページがあるかチェック
+      if (cards.length < CONFIG.RESULTS_PER_PAGE) {
+        console.log('  最終ページに到達しました。');
+        break;
+      }
+
+      page++;
+      await sleep(CONFIG.DELAY_MS);
+
+    } catch (error) {
+      console.error(`  エラー: ${error}`);
+      break;
+    }
+  }
+
+  return {
+    newCards,
+    stoppedAt: null,
+    totalFetched,
+    pagesProcessed: page
+  };
 }
 
 /**
@@ -270,7 +402,7 @@ function cardInfoToTsvRow(card: any): string {
 }
 
 /**
- * 新規カードを既存TSVにマージ
+ * 新規カードを既存TSVにマージ（重複排除・ID順ソート）
  */
 function mergeToTsv(newCards: CardInfo[], tsvPath: string): void {
   if (newCards.length === 0) {
@@ -278,34 +410,50 @@ function mergeToTsv(newCards: CardInfo[], tsvPath: string): void {
     return;
   }
 
-  // 新規カードをTSV行に変換
-  const newLines = newCards.map(card => cardInfoToTsvRow(card));
+  const header = [
+    'cardType', 'name', 'nameModified', 'ruby', 'cardId', 'ciid', 'imgs', 'text',
+    'biko', 'isNotLegalForOfficial',
+    'attribute', 'levelType', 'levelValue', 'race', 'monsterTypes',
+    'atk', 'def', 'linkMarkers', 'pendulumScale', 'pendulumText', 'isExtraDeck',
+    'spellEffectType', 'trapEffectType'
+  ].join('\t');
 
-  if (!fs.existsSync(tsvPath)) {
-    // TSVファイルが存在しない場合は新規作成
-    const header = [
-      'cardType', 'name', 'nameModified', 'ruby', 'cardId', 'ciid', 'imgs', 'text',
-      'biko', 'isNotLegalForOfficial',
-      'attribute', 'levelType', 'levelValue', 'race', 'monsterTypes',
-      'atk', 'def', 'linkMarkers', 'pendulumScale', 'pendulumText', 'isExtraDeck',
-      'spellEffectType', 'trapEffectType'
-    ].join('\t');
+  // cardIdをキーとしたMapを作成
+  const cardMap = new Map<string, string>();
 
-    fs.writeFileSync(tsvPath, header + '\n' + newLines.join('\n'), 'utf8');
-    console.log(`新規TSVファイルを作成しました: ${tsvPath}`);
-  } else {
-    // 既存TSVの先頭（ヘッダーの後）に新規カードを追加
+  // 既存データを読み込み
+  if (fs.existsSync(tsvPath)) {
     const existingContent = fs.readFileSync(tsvPath, 'utf8');
     const lines = existingContent.split('\n');
-    const header = lines[0];
-    const existingData = lines.slice(1).filter(line => line.trim());
-
-    // 新規カードを先頭に追加（発売日が新しい順なので）
-    const mergedLines = [header, ...newLines, ...existingData];
-    fs.writeFileSync(tsvPath, mergedLines.join('\n'), 'utf8');
-
-    console.log(`${newCards.length} 件の新規カードをTSVに追加しました`);
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      
+      const fields = line.split('\t');
+      const cardId = fields[4]; // cardIdは5番目のフィールド
+      if (cardId) {
+        cardMap.set(cardId, line);
+      }
+    }
   }
+
+  // 新規カードで上書き（新しいデータが優先）
+  for (const card of newCards) {
+    const line = cardInfoToTsvRow(card);
+    cardMap.set(card.cardId, line);
+  }
+
+  // cardIdを数値として降順ソート（新しいカードが上）
+  const sortedLines = Array.from(cardMap.entries())
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([id, line]) => line);
+
+  // ファイルに書き込み
+  const output = [header, ...sortedLines].join('\n');
+  fs.writeFileSync(tsvPath, output, 'utf8');
+
+  console.log(`${newCards.length} 件のカードをマージしました（合計: ${cardMap.size} 件、重複排除・ソート済み）`);
 }
 
 // ============================================================================
@@ -313,10 +461,11 @@ function mergeToTsv(newCards: CardInfo[], tsvPath: string): void {
 // ============================================================================
 
 async function main() {
-  console.log('=== カードデータ増分取得 ===\n');
+  const args = process.argv.slice(2);
+  const mode = parseScrapingMode(args);
 
   const scriptsDir = __dirname;
-  const outputDir = path.join(scriptsDir, '..', 'output');
+  const outputDir = path.join(scriptsDir, '../..', 'output', 'data');
   const tsvPath = path.join(outputDir, 'cards-all.tsv');
 
   // 出力ディレクトリ作成
@@ -324,11 +473,22 @@ async function main() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // 既存cardIdを読み込み
-  const existingCardIds = loadExistingCardIds(tsvPath);
+  let result: FetchResult;
 
-  // 増分取得実行
-  const result = await fetchIncremental(existingCardIds);
+  if (mode.type === 'top') {
+    console.log(`=== カードデータ 新しい方から${mode.count}件取得 ===\n`);
+    result = await fetchTopN(mode.count);
+  } else if (mode.type === 'range') {
+    console.log(`=== カードデータ 範囲指定取得 (${mode.start}番目から${mode.length}件) ===\n`);
+    result = await fetchRange(mode.start, mode.length);
+  } else if (mode.type === 'incremental') {
+    console.log('=== カードデータ増分取得 ===\n');
+    const existingCardIds = loadExistingCardIds(tsvPath);
+    result = await fetchIncremental(existingCardIds);
+  } else {
+    console.error('エラー: cards-dataでは --ids オプションはサポートされていません');
+    process.exit(1);
+  }
 
   console.log('\n=== 取得結果 ===');
   console.log(`処理ページ数: ${result.pagesProcessed}`);
