@@ -3,6 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { fetchFaqDetail, type FaqDetail } from '../utils/fetchers.js';
+import { escapeForTsv } from '../utils/formatters.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,46 +44,6 @@ interface FetchResult {
 // ユーティリティ関数
 // ============================================================================
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * TSV用にエスケープ
- */
-function escapeForTsv(value: string | undefined): string {
-  if (!value) return '';
-  return value
-    .replace(/\t/g, '\\t')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r');
-}
-
-/**
- * HTMLElement内のカードリンクを {{カード名|cid}} 形式のテンプレートに変換
- */
-function convertCardLinksToTemplate(element: HTMLElement): string {
-  const cloned = element.cloneNode(true) as HTMLElement;
-
-  // <br>を改行に変換
-  cloned.querySelectorAll('br').forEach(br => {
-    br.replaceWith('\n');
-  });
-
-  // カードリンク <a href="...?cid=5533">カード名</a> を {{カード名|5533}} に変換
-  cloned.querySelectorAll('a[href*="cid="]').forEach(link => {
-    const href = link.getAttribute('href') || '';
-    const match = href.match(/[?&]cid=(\d+)/);
-    if (match && match[1]) {
-      const cardId = match[1];
-      const cardName = link.textContent?.trim() || '';
-      link.replaceWith(`{{${cardName}|${cardId}}}`);
-    }
-  });
-
-  return cloned.textContent?.trim() || '';
-}
-
 /**
  * 既存TSVからfaqIdセットを読み込む
  */
@@ -108,65 +72,6 @@ function loadExistingFaqIds(tsvPath: string): Set<string> {
 
   console.log(`既存TSVから ${faqIds.size} 件のfaqIdを読み込みました`);
   return faqIds;
-}
-
-/**
- * Cookieを読み込む
- */
-function loadCookies(cookiesPath: string): string {
-  if (!fs.existsSync(cookiesPath)) {
-    return '';
-  }
-
-  const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-  const cookies: string[] = [];
-  cookieLines.forEach(line => {
-    if (line.startsWith('#') || line.trim() === '') return;
-    const parts = line.split('\t');
-    if (parts.length >= 7) {
-      cookies.push(`${parts[5]}=${parts[6]}`);
-    }
-  });
-  return cookies.join('; ');
-}
-
-/**
- * セッションを確立する（FAQ検索ページにアクセス）
- */
-function establishSession(): Promise<string> {
-  const url = `${CONFIG.BASE_URL}?ope=1&request_locale=${CONFIG.LOCALE}`;
-
-  console.log('セッションを確立中...');
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      }
-    }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
-      res.on('end', () => {
-        // Set-Cookieヘッダーからセッションを取得
-        const cookies: string[] = [];
-        const setCookieHeaders = res.headers['set-cookie'];
-        if (setCookieHeaders) {
-          setCookieHeaders.forEach(cookie => {
-            const match = cookie.match(/^([^=]+=[^;]+)/);
-            if (match) {
-              cookies.push(match[1]);
-            }
-          });
-        }
-        const cookieJar = cookies.join('; ');
-        console.log(`✓ セッション確立完了 (${cookies.length} cookies)\n`);
-        resolve(cookieJar);
-      });
-    }).on('error', (error) => {
-      console.error('セッション確立エラー:', error);
-      resolve('');
-    });
-  });
 }
 
 /**
@@ -215,66 +120,6 @@ function fetchFaqIdListFromPage(page: number, cookieJar: string): Promise<string
     }).on('error', (error) => {
       console.error(`  リクエストエラー (ページ ${page}):`, error);
       resolve([]);
-    });
-  });
-}
-
-/**
- * 個別FAQ詳細を取得
- */
-function fetchFaqDetail(faqId: string, cookieJar: string): Promise<FaqInfo | null> {
-  const url = `${CONFIG.BASE_URL}?ope=5&fid=${faqId}&request_locale=${CONFIG.LOCALE}`;
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookieJar
-      }
-    }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk) => { chunks.push(chunk); });
-      res.on('end', () => {
-        const html = Buffer.concat(chunks).toString('utf8');
-        try {
-          const dom = new JSDOM(html, { url });
-          const doc = dom.window.document as unknown as Document;
-
-          const questionElem = doc.querySelector('#question_text');
-          if (!questionElem) {
-            resolve(null);
-            return;
-          }
-          const question = convertCardLinksToTemplate(questionElem as HTMLElement);
-
-          if (!question) {
-            resolve(null);
-            return;
-          }
-
-          const answerElem = doc.querySelector('#answer_text');
-          let answer = '';
-          if (answerElem) {
-            answer = convertCardLinksToTemplate(answerElem as HTMLElement);
-          }
-
-          const dateElem = doc.querySelector('#tag_update .date');
-          const updatedAt = dateElem?.textContent?.trim() || undefined;
-
-          resolve({
-            faqId,
-            question,
-            answer,
-            updatedAt
-          });
-        } catch (error) {
-          console.error(`  パースエラー (FAQ ${faqId}):`, error);
-          resolve(null);
-        }
-      });
-    }).on('error', (error) => {
-      console.error(`  リクエストエラー (FAQ ${faqId}):`, error);
-      resolve(null);
     });
   });
 }
@@ -347,7 +192,42 @@ async function fetchIncremental(existingFaqIds: Set<string>, cookieJar: string):
 }
 
 /**
- * 新規FAQを既存TSVにマージ
+ * 指定されたfaqIdリストを取得
+ */
+async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise<FaqInfo[]> {
+  const faqs: FaqInfo[] = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  console.log(`\n=== 指定FAQの取得 (${faqIds.length}件) ===\n`);
+
+  for (let i = 0; i < faqIds.length; i++) {
+    const faqId = faqIds[i];
+    const progress = `[${i + 1}/${faqIds.length}]`;
+
+    process.stdout.write(`\r${progress} 取得中: FAQ ${faqId}...`);
+
+    const detail = await fetchFaqDetail(faqId, cookieJar);
+
+    if (detail) {
+      faqs.push(detail);
+      successCount++;
+    } else {
+      errorCount++;
+    }
+
+    if (i < faqIds.length - 1) {
+      await sleep(CONFIG.DELAY_MS);
+    }
+  }
+
+  console.log(`\n\n取得完了: 成功=${successCount}, エラー=${errorCount}`);
+
+  return faqs;
+}
+
+/**
+ * 新規FAQを既存TSVにマージ（先頭に追加）
  */
 function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string): void {
   if (newFaqs.length === 0) {
@@ -382,12 +262,95 @@ function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string): void {
   }
 }
 
+/**
+ * 特定FAQを既存TSVで更新
+ */
+function updateTsvWithFaqs(faqs: FaqInfo[], tsvPath: string): void {
+  if (faqs.length === 0) {
+    console.log('更新するFAQがありません。');
+    return;
+  }
+
+  // バックアップ作成
+  const backupPath = tsvPath + '.backup';
+  if (fs.existsSync(tsvPath)) {
+    fs.copyFileSync(tsvPath, backupPath);
+    console.log(`\nバックアップ作成: ${backupPath}`);
+  }
+
+  // 既存TSVを読み込み
+  const content = fs.readFileSync(tsvPath, 'utf8');
+  const lines = content.split('\n');
+  const header = lines[0];
+
+  // faqIdでマップを作成
+  const faqMap = new Map<string, string>();
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    const faqId = line.split('\t')[0];
+    if (faqId) {
+      faqMap.set(faqId, line);
+    }
+  }
+
+  // 取得したFAQで更新
+  for (const faq of faqs) {
+    const newLine = [
+      faq.faqId,
+      escapeForTsv(faq.question),
+      escapeForTsv(faq.answer),
+      escapeForTsv(faq.updatedAt)
+    ].join('\t');
+
+    faqMap.set(faq.faqId, newLine);
+  }
+
+  // TSVを再構築
+  const newLines = [header];
+  for (const [faqId, line] of faqMap.entries()) {
+    newLines.push(line);
+  }
+
+  // 更新
+  fs.writeFileSync(tsvPath, newLines.join('\n'), 'utf8');
+
+  console.log(`✓ ${faqs.length} 件のFAQを更新しました`);
+}
+
 // ============================================================================
 // メイン処理
 // ============================================================================
 
 async function main() {
-  console.log('=== FAQ増分取得 ===\n');
+  const args = process.argv.slice(2);
+
+  // オプション解析
+  let idsToFetch: string[] = [];
+  let idsFile: string | null = null;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--ids' && i + 1 < args.length) {
+      idsToFetch = args[i + 1].split(',').map(id => id.trim()).filter(id => id);
+      i++;
+    } else if (args[i] === '--ids-file' && i + 1 < args.length) {
+      idsFile = args[i + 1];
+      i++;
+    }
+  }
+
+  // ファイルからIDを読み込み
+  if (idsFile) {
+    if (!fs.existsSync(idsFile)) {
+      console.error(`ファイルが見つかりません: ${idsFile}`);
+      process.exit(1);
+    }
+    const fileIds = fs.readFileSync(idsFile, 'utf8')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line);
+    idsToFetch.push(...fileIds);
+  }
 
   const scriptsDir = __dirname;
   const dataDir = path.join(scriptsDir, '../..', 'output', 'data');
@@ -405,24 +368,34 @@ async function main() {
     process.exit(1);
   }
 
-  // 既存faqIdを読み込み
-  const existingFaqIds = loadExistingFaqIds(tsvPath);
+  if (idsToFetch.length > 0) {
+    // 特定IDを取得するモード
+    console.log(`=== FAQ指定ID取得 (${idsToFetch.length}件) ===\n`);
+    const faqs = await fetchSpecificFaqIds(idsToFetch, cookieJar);
+    updateTsvWithFaqs(faqs, tsvPath);
+  } else {
+    // 増分取得モード
+    console.log('=== FAQ増分取得 ===\n');
 
-  // 増分取得実行
-  const result = await fetchIncremental(existingFaqIds, cookieJar);
+    // 既存faqIdを読み込み
+    const existingFaqIds = loadExistingFaqIds(tsvPath);
 
-  console.log('\n=== 取得結果 ===');
-  console.log(`処理ページ数: ${result.pagesProcessed}`);
-  console.log(`取得FAQ ID総数: ${result.totalFetched}`);
-  console.log(`新規FAQ数: ${result.newFaqs.length}`);
-  if (result.stoppedAt) {
-    console.log(`停止位置 (既存faqId): ${result.stoppedAt}`);
-  }
+    // 増分取得実行
+    const result = await fetchIncremental(existingFaqIds, cookieJar);
 
-  // マージ
-  if (result.newFaqs.length > 0) {
-    console.log('\n=== TSVにマージ中 ===');
-    mergeToTsv(result.newFaqs, tsvPath);
+    console.log('\n=== 取得結果 ===');
+    console.log(`処理ページ数: ${result.pagesProcessed}`);
+    console.log(`取得FAQ ID総数: ${result.totalFetched}`);
+    console.log(`新規FAQ数: ${result.newFaqs.length}`);
+    if (result.stoppedAt) {
+      console.log(`停止位置 (既存faqId): ${result.stoppedAt}`);
+    }
+
+    // マージ
+    if (result.newFaqs.length > 0) {
+      console.log('\n=== TSVにマージ中 ===');
+      mergeToTsv(result.newFaqs, tsvPath);
+    }
   }
 
   console.log('\n=== 完了 ===');
