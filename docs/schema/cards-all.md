@@ -24,11 +24,11 @@ Card basic information and attributes.
 | atk | number | Attack power | `400` |
 | def | number | Defense power | `400` |
 | linkMarkers | JSON array | Link markers (empty for non-link monsters) | `[]` |
-| pendulumScale | number | Pendulum scale (empty for non-pendulum) | Empty |
-| pendulumText | string | Pendulum effect text | Empty for non-pendulum |
+| pendulumScale | number | Pendulum scale (empty for non-pendulum) | `""` |
+| pendulumText | string | Pendulum effect text | `""` |
 | isExtraDeck | boolean | Whether card belongs to Extra Deck | `false` |
-| spellEffectType | string | Spell card type (quick-play/field/ritual/etc) | Empty for non-spell |
-| trapEffectType | string | Trap card type (normal/continuous/counter) | Empty for non-trap |
+| spellEffectType | string | Spell card type (quick-play/field/ritual/etc) | `""` |
+| trapEffectType | string | Trap card type (normal/continuous/counter) | `""` |
 
 ## Data Types
 

@@ -10,8 +10,8 @@ Card supplementary information and rule clarifications.
 | cardName | string | Card name for reference | `ミラクル・エクスクルーダー` |
 | supplementInfo | string | Rule clarification and supplement text | `【『このカード名はルール上「E・HERO」カードとしても扱う』について】\n...` |
 | supplementDate | date | Date when supplement was last updated (YYYY-MM-DD) | `2025-12-18` |
-| pendulumSupplementInfo | string | Pendulum effect supplement text (empty for non-pendulum) | Empty |
-| pendulumSupplementDate | date | Date when pendulum supplement was last updated | Empty |
+| pendulumSupplementInfo | string | Pendulum effect supplement text (empty for non-pendulum) | `""` |
+| pendulumSupplementDate | date | Date when pendulum supplement was last updated | `""` |
 
 ## Data Types
 
