@@ -44,7 +44,7 @@ jobs:
           echo "前回リリース: ${LATEST_TAG}"
           
           # 最新リリースから前回データをダウンロード
-          gh release download "${LATEST_TAG}" --pattern "ygo-data-*.tar.gz" --dir .
+          gh release download "${LATEST_TAG}" --pattern "ygo-data-*.tar.gz" --dir . --clobber
           tar -xzf ygo-data-*.tar.gz -C output/data/
           echo "✓ 前回データを展開しました"
           ls -lh output/data/
