@@ -135,6 +135,8 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
   let page = 1;
   let shouldStop = false;
   let updatedCount = 0;
+  let consecutiveExisting = 0; // 連続で既存FAQを検出した回数
+  const STOP_THRESHOLD = 5; // 連続5件で停止
 
   console.log('\n=== FAQ増分取得開始 ===\n');
 
@@ -167,23 +169,30 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
         const newDate = detail.updatedAt || '';
 
         if (newDate <= existingDate) {
-          // 既存データと同じか古い → 停止
-          console.log(`  既存FAQ検出: faqId=${faqId} (更新日時: ${existingDate})`);
-          stoppedAt = faqId;
-          shouldStop = true;
-          break;
+          // 既存データと同じか古い → カウント
+          consecutiveExisting++;
+          console.log(`  既存FAQ検出 (${consecutiveExisting}/${STOP_THRESHOLD}): faqId=${faqId} (更新日時: ${existingDate})`);
+
+          if (consecutiveExisting >= STOP_THRESHOLD) {
+            console.log(`  連続${STOP_THRESHOLD}件の既存FAQを検出。停止します。`);
+            stoppedAt = faqId;
+            shouldStop = true;
+            break;
+          }
         } else {
-          // 更新されている → 取得
+          // 更新されている → 取得してカウンターをリセット
           console.log(`  FAQ更新検出: faqId=${faqId} (${existingDate} → ${newDate})`);
           newFaqs.push(detail);
           updatedCount++;
           newInPage++;
+          consecutiveExisting = 0; // リセット
           process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
         }
       } else {
-        // 新規FAQ
+        // 新規FAQ → カウンターをリセット
         newFaqs.push(detail);
         newInPage++;
+        consecutiveExisting = 0; // リセット
         process.stdout.write(`\r  FAQ取得中: 新規+更新=${newInPage} 件...`);
       }
 
