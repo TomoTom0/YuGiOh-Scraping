@@ -316,7 +316,7 @@ async function main() {
   console.log('=== カードデータ増分取得 ===\n');
 
   const scriptsDir = __dirname;
-  const outputDir = path.join(scriptsDir, '..', 'output');
+  const outputDir = path.join(scriptsDir, '../..', 'output', 'data');
   const tsvPath = path.join(outputDir, 'cards-all.tsv');
 
   // 出力ディレクトリ作成

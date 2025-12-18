@@ -7,6 +7,45 @@ import https from 'https';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * セッションを確立する（FAQ検索ページにアクセス）
+ */
+function establishSession(): Promise<string> {
+  const url = 'https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=1&request_locale=ja';
+
+  console.log('セッションを確立中...');
+
+  return new Promise((resolve) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      }
+    }, (res) => {
+      let html = '';
+      res.on('data', (chunk) => { html += chunk; });
+      res.on('end', () => {
+        // Set-Cookieヘッダーからセッションを取得
+        const cookies: string[] = [];
+        const setCookieHeaders = res.headers['set-cookie'];
+        if (setCookieHeaders) {
+          setCookieHeaders.forEach(cookie => {
+            const match = cookie.match(/^([^=]+=[^;]+)/);
+            if (match) {
+              cookies.push(match[1]);
+            }
+          });
+        }
+        const cookieJar = cookies.join('; ');
+        console.log(`✓ セッション確立完了 (${cookies.length} cookies)\n`);
+        resolve(cookieJar);
+      });
+    }).on('error', (error) => {
+      console.error('セッション確立エラー:', error);
+      resolve('');
+    });
+  });
+}
+
+/**
  * 待機
  */
 function sleep(ms: number): Promise<void> {
@@ -72,25 +111,10 @@ async function fetchFaqIdListFromPage(page: number, rp: number, cookieJar: strin
 async function main() {
   console.log('=== Fetching All FAQ IDs from FAQ List ===\n');
 
-  // セッション確立用のCookieを取得
-  console.log('Loading cookies...');
-  const cookiesPath = path.join(__dirname, 'cookies.txt');
-  let cookieJar = '';
-
-  if (fs.existsSync(cookiesPath)) {
-    const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-    const cookies: string[] = [];
-    cookieLines.forEach(line => {
-      if (line.startsWith('#') || line.trim() === '') return;
-      const parts = line.split('\t');
-      if (parts.length >= 7) {
-        cookies.push(`${parts[5]}=${parts[6]}`);
-      }
-    });
-    cookieJar = cookies.join('; ');
-    console.log('✓ Cookies loaded\n');
-  } else {
-    console.error('✗ cookies.txt not found');
+  // セッション確立
+  const cookieJar = await establishSession();
+  if (!cookieJar) {
+    console.error('✗ セッションの確立に失敗しました');
     process.exit(1);
   }
 
@@ -142,7 +166,11 @@ async function main() {
   }
 
   // TSVファイルに書き込み（1列のみ）
-  const outputPath = path.join(__dirname, 'faqid-all.tsv');
+  const dataDir = path.join(__dirname, '../..', 'output', 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  const outputPath = path.join(dataDir, 'faqid-all.tsv');
   console.log(`\n\nWriting FAQ IDs to ${outputPath}...`);
 
   const tsvLines: string[] = [];

@@ -1,21 +1,10 @@
 # スクレイピング成果物（自動生成可能なため除外）
 # Output files - TSV data files
-cards-data/output/*.tsv
-cards-detail/output/*.tsv
-faq/output/*.tsv
-
-# 入力データ（cards-dataからコピーされたファイル）
-cards-detail/input/*.tsv
-faq/input/*.tsv
-
-# 認証情報（重要: 絶対にコミットしない）
-# Cookies - authentication data
-**/config/cookies.txt
-**/config/cookies-faq.txt
+output/**/*.tsv
 
 # 一時ファイル・中間ファイル
 # Temporary and intermediate files
-**/temp/
+output/**/.temp/
 **/*-temp-*.tsv
 
 # ログファイル
@@ -48,17 +37,18 @@ _archived/
 !**/*.config.js
 
 # HTMLファイル（スクレイピング元データ）
-**/cards/*.html
+src/**/cards/*.html
 
 # 参照用フォルダ
 _ref/
 
-# Node.js
+# Node.js / Bun
 # Node modules
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # OS generated files
 .DS_Store

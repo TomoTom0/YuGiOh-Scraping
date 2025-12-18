@@ -6,6 +6,45 @@ import https from 'https';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * セッションを確立する（FAQ検索ページにアクセス）
+ */
+function establishSession(): Promise<string> {
+  const url = 'https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=1&request_locale=ja';
+
+  console.log('セッションを確立中...');
+
+  return new Promise((resolve) => {
+    https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      }
+    }, (res) => {
+      let html = '';
+      res.on('data', (chunk) => { html += chunk; });
+      res.on('end', () => {
+        // Set-Cookieヘッダーからセッションを取得
+        const cookies: string[] = [];
+        const setCookieHeaders = res.headers['set-cookie'];
+        if (setCookieHeaders) {
+          setCookieHeaders.forEach(cookie => {
+            const match = cookie.match(/^([^=]+=[^;]+)/);
+            if (match) {
+              cookies.push(match[1]);
+            }
+          });
+        }
+        const cookieJar = cookies.join('; ');
+        console.log(`✓ セッション確立完了 (${cookies.length} cookies)\n`);
+        resolve(cookieJar);
+      });
+    }).on('error', (error) => {
+      console.error('セッション確立エラー:', error);
+      resolve('');
+    });
+  });
+}
+
 // ============================================================================
 // 設定
 // ============================================================================
@@ -116,25 +155,6 @@ function loadAllCardIds(cardsPath: string): string[] {
   return cardIds;
 }
 
-/**
- * Cookieを読み込む
- */
-function loadCookies(cookiesPath: string): string {
-  if (!fs.existsSync(cookiesPath)) {
-    return '';
-  }
-
-  const cookieLines = fs.readFileSync(cookiesPath, 'utf8').split('\n');
-  const cookies: string[] = [];
-  cookieLines.forEach(line => {
-    if (line.startsWith('#') || line.trim() === '') return;
-    const parts = line.split('\t');
-    if (parts.length >= 7) {
-      cookies.push(`${parts[5]}=${parts[6]}`);
-    }
-  });
-  return cookies.join('; ');
-}
 
 /**
  * QAページから補足情報を取得
@@ -277,24 +297,20 @@ async function main() {
   console.log('=== cards-detail増分取得 ===\n');
 
   const scriptsDir = __dirname;
-  const inputDir = path.join(scriptsDir, '..', 'input');
-  const outputDir = path.join(scriptsDir, '..', 'output');
-  const cardsPath = path.join(inputDir, 'cards-all.tsv');
-  const tsvPath = path.join(outputDir, 'qa-all.tsv');
-  const cookiesPath = path.join(scriptsDir, '..', 'config', 'cookies.txt');
+  const dataDir = path.join(scriptsDir, '../..', 'output', 'data');
+  const cardsPath = path.join(dataDir, 'cards-all.tsv');
+  const tsvPath = path.join(dataDir, 'details-all.tsv');
 
   // 出力ディレクトリ作成
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  // Cookie読み込み
-  console.log('Cookieを読み込み中...');
-  const cookieJar = loadCookies(cookiesPath);
+  // セッション確立
+  const cookieJar = await establishSession();
   if (!cookieJar) {
-    console.log('cookies.txtが見つかりません。Cookieなしで続行します。');
-  } else {
-    console.log('✓ Cookie読み込み完了\n');
+    console.error('✗ セッションの確立に失敗しました');
+    process.exit(1);
   }
 
   // 全カードIDを読み込み
