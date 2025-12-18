@@ -34,13 +34,15 @@ ygo-scraping/
 - 📅 **更新頻度**: 毎週日曜日 00:00 UTC（日本時間 月曜日 09:00）自動更新
 - 📦 **形式**: tar.gz圧縮されたTSVファイル
 - 🔄 **保持数**: 最新3世代（古いものは自動削除）
-- 📥 **ダウンロード**: `ygo-data-YYYYMMDD-HHMMSS.tar.gz`
+- 📥 **ダウンロード**: `ygo-data-YYYY.MM.DD.tar.gz`
 
 ```bash
-# ダウンロード例
-wget https://github.com/TomoTom0/ygo-scraping/releases/latest/download/ygo-data-*.tar.gz
-tar -xzf ygo-data-*.tar.gz
+# ダウンロード例（最新版）
+wget https://github.com/TomoTom0/ygo-scraping/releases/latest/download/ygo-data-2025.12.19.tar.gz
+tar -xzf ygo-data-2025.12.19.tar.gz
 ```
+
+**注意**: 初回データは手動でアップロードする必要があります。自動更新は2回目以降（増分取得）で機能します。
 
 ### 1. cards-data/ - カード基本情報
 

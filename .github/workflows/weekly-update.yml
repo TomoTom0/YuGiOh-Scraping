@@ -25,14 +25,32 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Download previous data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== 前回データをダウンロード ==="
+          mkdir -p output/data
+          
+          # 最新リリースから前回データをダウンロード
+          if gh release download --pattern "ygo-data-*.tar.gz" --dir . 2>/dev/null; then
+            tar -xzf ygo-data-*.tar.gz -C output/data/
+            echo "✓ 前回データを展開しました"
+            ls -lh output/data/
+          else
+            echo "❌ エラー: 前回リリースが見つかりません"
+            echo "初回データを手動でアップロードしてください"
+            exit 1
+          fi
+
       - name: Install dependencies
         run: bun install
 
-      - name: Run data update
+      - name: Run data update (incremental)
         run: |
-          echo "=== データ更新開始 ==="
+          echo "=== 増分データ更新開始 ==="
           bun run update:all
-          echo "=== データ更新完了 ==="
+          echo "=== 増分データ更新完了 ==="
 
       - name: Check data files
         run: |
@@ -43,10 +61,10 @@ jobs:
 
       - name: Create archive
         run: |
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          ARCHIVE_NAME="ygo-data-${TIMESTAMP}.tar.gz"
+          DATE=$(date -u +%Y.%m.%d)
+          ARCHIVE_NAME="ygo-data-${DATE}.tar.gz"
           echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
-          echo "RELEASE_TAG=data-${TIMESTAMP}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=${DATE}" >> $GITHUB_ENV
           
           cd output/data
           tar -czf ../../${ARCHIVE_NAME} *.tsv
@@ -87,7 +105,7 @@ jobs:
           # リリース作成
           gh release create "${RELEASE_TAG}" \
             "${ARCHIVE_NAME}" \
-            --title "遊戯王データ $(date '+%Y-%m-%d')" \
+            --title "遊戯王データ ${RELEASE_TAG}" \
             --notes-file release-notes.md
 
       - name: Keep only latest 3 releases
@@ -96,8 +114,9 @@ jobs:
         run: |
           echo "=== 古いリリースを削除 ==="
           
-          # data-* タグのリリースを取得（新しい順）
-          RELEASES=$(gh release list --limit 100 | grep "^data-" | awk '{print $3}')
+          # 日付形式のタグのリリースを取得（新しい順）
+          # 形式: YYYY.MM.DD
+          RELEASES=$(gh release list --limit 100 | grep -E "^[0-9]{4}\.[0-9]{2}\.[0-9]{2}" | awk '{print $1}')
           
           # 配列に変換
           readarray -t RELEASE_ARRAY <<< "$RELEASES"
