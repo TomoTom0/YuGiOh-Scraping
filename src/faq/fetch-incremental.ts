@@ -415,9 +415,7 @@ async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise
 }
 
 /**
- * 新規・更新FAQを既存TSVにマージ
- * - 更新されたFAQは既存データを置換
- * - 新規FAQは先頭に追加
+ * 新規・更新FAQを既存TSVにマージ（重複排除・ID順ソート）
  */
 function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string, existingFaqs: Map<string, string>): void {
   if (newFaqs.length === 0) {
@@ -425,84 +423,63 @@ function mergeToTsv(newFaqs: FaqInfo[], tsvPath: string, existingFaqs: Map<strin
     return;
   }
 
-  if (!fs.existsSync(tsvPath)) {
-    // TSVファイルが存在しない場合は新規作成
-    const header = ['faqId', 'question', 'answer', 'updatedAt'].join('\t');
-    const newLines = newFaqs.map(faq => [
-      faq.faqId,
-      escapeForTsv(faq.question),
-      escapeForTsv(faq.answer),
-      escapeForTsv(faq.updatedAt)
-    ].join('\t'));
-    fs.writeFileSync(tsvPath, header + '\n' + newLines.join('\n'), 'utf8');
-    console.log(`新規TSVファイルを作成しました: ${tsvPath}`);
-    return;
-  }
+  const header = ['faqId', 'question', 'answer', 'updatedAt'].join('\t');
 
-  // 既存TSVを読み込み
-  const existingContent = fs.readFileSync(tsvPath, 'utf8');
-  const lines = existingContent.split('\n');
-  const header = lines[0];
-
-  // 既存データをMapに変換
+  // faqIdをキーとしたMapを作成
   const faqMap = new Map<string, string>();
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim()) continue;
-    const faqId = line.split('\t')[0];
-    if (faqId) {
-      faqMap.set(faqId, line);
+
+  // 既存データを読み込み
+  if (fs.existsSync(tsvPath)) {
+    const existingContent = fs.readFileSync(tsvPath, 'utf8');
+    const lines = existingContent.split('\n');
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      
+      const fields = line.split('\t');
+      const faqId = fields[0];
+      if (faqId) {
+        faqMap.set(faqId, line);
+      }
     }
   }
 
-  // 新規・更新FAQを処理
-  const newFaqIds: string[] = [];
+  // 新規・更新FAQで上書き（新しいデータが優先）
+  let newCount = 0;
   let updatedCount = 0;
-
+  
   for (const faq of newFaqs) {
-    const newLine = [
+    const line = [
       faq.faqId,
       escapeForTsv(faq.question),
       escapeForTsv(faq.answer),
       escapeForTsv(faq.updatedAt)
     ].join('\t');
-
+    
     if (existingFaqs.has(faq.faqId)) {
-      // 既存FAQを更新
-      faqMap.set(faq.faqId, newLine);
       updatedCount++;
     } else {
-      // 新規FAQ（先頭に追加するためIDを記録）
-      newFaqIds.push(faq.faqId);
-      faqMap.set(faq.faqId, newLine);
+      newCount++;
     }
+    
+    faqMap.set(faq.faqId, line);
   }
 
-  // TSVを再構築（新規FAQを先頭に）
-  const mergedLines = [header];
+  // faqIdを数値として降順ソート（新しいFAQが上）
+  const sortedLines = Array.from(faqMap.entries())
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([id, line]) => line);
 
-  // 新規FAQを先頭に追加
-  for (const faqId of newFaqIds) {
-    const line = faqMap.get(faqId);
-    if (line) {
-      mergedLines.push(line);
-      faqMap.delete(faqId);
-    }
-  }
+  // ファイルに書き込み
+  const output = [header, ...sortedLines].join('\n');
+  fs.writeFileSync(tsvPath, output, 'utf8');
 
-  // 既存FAQ（更新含む）を追加
-  for (const [faqId, line] of faqMap.entries()) {
-    mergedLines.push(line);
-  }
-
-  fs.writeFileSync(tsvPath, mergedLines.join('\n'), 'utf8');
-
-  const newCount = newFaqIds.length;
-  console.log(`${newFaqs.length} 件をTSVに反映しました (新規: ${newCount}, 更新: ${updatedCount})`);
+  console.log(`${newFaqs.length} 件をマージしました (新規: ${newCount}, 更新: ${updatedCount}, 合計: ${faqMap.size} 件、重複排除・ソート済み)`);
 }
 
 /**
- * 特定FAQを既存TSVで更新
+ * 特定FAQを既存TSVで更新（重複排除・ID順ソート）
  */
 function updateTsvWithFaqs(faqs: FaqInfo[], tsvPath: string): void {
   if (faqs.length === 0) {
@@ -510,51 +487,49 @@ function updateTsvWithFaqs(faqs: FaqInfo[], tsvPath: string): void {
     return;
   }
 
-  // バックアップ作成
-  const backupPath = tsvPath + '.backup';
-  if (fs.existsSync(tsvPath)) {
-    fs.copyFileSync(tsvPath, backupPath);
-    console.log(`\nバックアップ作成: ${backupPath}`);
-  }
+  const header = ['faqId', 'question', 'answer', 'updatedAt'].join('\t');
 
-  // 既存TSVを読み込み
-  const content = fs.readFileSync(tsvPath, 'utf8');
-  const lines = content.split('\n');
-  const header = lines[0];
-
-  // faqIdでマップを作成
+  // faqIdをキーとしたMapを作成
   const faqMap = new Map<string, string>();
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line.trim()) continue;
-    const faqId = line.split('\t')[0];
-    if (faqId) {
-      faqMap.set(faqId, line);
+
+  // 既存データを読み込み
+  if (fs.existsSync(tsvPath)) {
+    const existingContent = fs.readFileSync(tsvPath, 'utf8');
+    const lines = existingContent.split('\n');
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      
+      const fields = line.split('\t');
+      const faqId = fields[0];
+      if (faqId) {
+        faqMap.set(faqId, line);
+      }
     }
   }
 
-  // 取得したFAQで更新
+  // 取得したFAQで上書き（新しいデータが優先）
   for (const faq of faqs) {
-    const newLine = [
+    const line = [
       faq.faqId,
       escapeForTsv(faq.question),
       escapeForTsv(faq.answer),
       escapeForTsv(faq.updatedAt)
     ].join('\t');
-
-    faqMap.set(faq.faqId, newLine);
+    faqMap.set(faq.faqId, line);
   }
 
-  // TSVを再構築
-  const newLines = [header];
-  for (const [faqId, line] of faqMap.entries()) {
-    newLines.push(line);
-  }
+  // faqIdを数値として降順ソート（新しいFAQが上）
+  const sortedLines = Array.from(faqMap.entries())
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([id, line]) => line);
 
-  // 更新
-  fs.writeFileSync(tsvPath, newLines.join('\n'), 'utf8');
+  // ファイルに書き込み
+  const output = [header, ...sortedLines].join('\n');
+  fs.writeFileSync(tsvPath, output, 'utf8');
 
-  console.log(`✓ ${faqs.length} 件のFAQを更新しました`);
+  console.log(`✓ ${faqs.length} 件のFAQを更新しました（合計: ${faqMap.size} 件、重複排除・ソート済み）`);
 }
 
 // ============================================================================

@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+
 /**
  * 待機
  */
@@ -44,7 +46,6 @@ export function parseScrapingMode(args: string[]): ScrapingMode {
       idsToFetch = args[i + 1].split(',').map(id => id.trim()).filter(id => id);
       i++;
     } else if (args[i] === '--ids-file' && i + 1 < args.length) {
-      const fs = require('fs');
       const idsFile = args[i + 1];
       if (!fs.existsSync(idsFile)) {
         throw new Error(`ファイルが見つかりません: ${idsFile}`);

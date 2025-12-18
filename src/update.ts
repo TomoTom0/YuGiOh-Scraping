@@ -109,10 +109,10 @@ async function runTask(taskKey: string, forceAll: boolean, extraArgs: string[] =
 
   if (forceAll && task.fullScript) {
     await runScript(task.fullScript, extraArgs);
-  } else if (forceAll && !task.fullScript) {
-    console.log(`⚠ ${task.name}には全件取得スクリプトがありません。増分取得を実行します。`);
-    await runScript(task.incrementalScript, extraArgs);
   } else {
+    if (forceAll && !task.fullScript) {
+      console.log(`⚠ ${task.name}には全件取得スクリプトがありません。増分取得を実行します。`);
+    }
     await runScript(task.incrementalScript, extraArgs);
   }
 }

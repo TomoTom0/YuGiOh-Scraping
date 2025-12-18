@@ -157,7 +157,8 @@ bun run update:all --range 0 10
 
 ```bash
 # カード基本情報の全件取得
-bun run update:cards --force-all
+# 注: cardsは手動でHTMLを取得後、parse-to-tsv.tsで変換する必要があります
+# 詳細は cards-data/README.md を参照
 
 # カード詳細情報の全件取得
 bun run update:detail --force-all
@@ -165,8 +166,9 @@ bun run update:detail --force-all
 # FAQ情報の全件取得
 bun run update:faq --force-all
 
-# 全てを全件取得
-bun run update:all --force-all
+# 詳細とFAQのみ全件取得
+bun run update:detail --force-all
+bun run update:faq --force-all
 ```
 
 #### 出力先
@@ -221,10 +223,10 @@ bun run src/faq/fetch-faq-from-list.ts --start-from=4000
 
 | コマンド | 説明 | 所要時間 |
 |---------|------|---------|
-| `bun run update:cards --force-all` | カード基本情報の全件取得 | 数分 |
 | `bun run update:detail --force-all` | カード詳細情報の全件取得 | 約2.5時間 |
 | `bun run update:faq --force-all` | FAQ情報の全件取得 | 約3.5時間 |
-| `bun run update:all --force-all` | 全データの全件取得 | 約6時間 |
+
+**注意**: カード基本情報（cards）の全件取得は、手動でHTMLファイルを取得後、`parse-to-tsv.ts`で変換する必要があります。詳細は`src/cards-data/`のドキュメントを参照してください。
 
 ### 増分取得の仕組み
 
