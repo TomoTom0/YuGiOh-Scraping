@@ -61,7 +61,7 @@ gh release create ${DATE} \
 初回リリースが完了すると、次の日曜日から自動的に週次更新が実行されます。
 
 GitHub Actions の実行は以下で確認できます：
-https://github.com/TomoTom0/ygo-scraping/actions
+https://github.com/TomoTom0/YuGiOh-Scraping/actions
 
 ## 手動での更新実行
 

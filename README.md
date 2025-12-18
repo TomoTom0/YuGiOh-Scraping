@@ -29,7 +29,7 @@ ygo-scraping/
 
 ### データ配布
 
-**最新データは[GitHub Releases](https://github.com/TomoTom0/ygo-scraping/releases)からダウンロードできます。**
+**最新データは[GitHub Releases](https://github.com/TomoTom0/YuGiOh-Scraping/releases)からダウンロードできます。**
 
 - 📅 **更新頻度**: 毎週金曜日 20:00 UTC（日本時間 土曜日 05:00）自動更新
 - 📦 **形式**: tar.gz圧縮されたTSVファイル
@@ -38,7 +38,7 @@ ygo-scraping/
 
 ```bash
 # ダウンロード例（最新版）
-wget https://github.com/TomoTom0/ygo-scraping/releases/latest/download/ygo-data-2025.12.19.tar.gz
+wget https://github.com/TomoTom0/YuGiOh-Scraping/releases/latest/download/ygo-data-2025.12.19.tar.gz
 tar -xzf ygo-data-2025.12.19.tar.gz
 ```
 
