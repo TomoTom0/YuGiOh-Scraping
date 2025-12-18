@@ -31,10 +31,10 @@ ygo-scraping/
 
 **最新データは[GitHub Releases](https://github.com/TomoTom0/YuGiOh-Scraping/releases)からダウンロードできます。**
 
-- 📅 **更新頻度**: 毎週金曜日 20:00 UTC（日本時間 土曜日 05:00）自動更新
-- 📦 **形式**: tar.gz圧縮されたTSVファイル
-- 🔄 **保持数**: 最新3世代（古いものは自動削除）
-- 📥 **ダウンロード**: `ygo-data-YYYY.MM.DD.tar.gz`
+- 更新頻度: 毎週金曜日 20:00 UTC（日本時間 土曜日 05:00）自動更新
+- 形式: tar.gz圧縮されたTSVファイル
+- 保持数: 最新3世代（古いものは自動削除）
+- ダウンロード: `ygo-data-YYYY.MM.DD.tar.gz`
 
 ```bash
 # ダウンロード例（最新版を自動取得）
@@ -58,6 +58,7 @@ tar -xzf ygo-data-latest.tar.gz
 - **件数**: 13,754カード
 - **サイズ**: 8.2MB
 - **フォーマット**: TSV（タブ区切り）
+- **スキーマ**: [docs/schema/cards-all.md](docs/schema/cards-all.md)
 
 **カラム**:
 ```
@@ -67,10 +68,7 @@ atk | def | linkMarkers | pendulumScale | pendulumText | isExtraDeck |
 spellEffectType | trapEffectType
 ```
 
-**追加カラム（2025-11-21）**:
-- `nameModified`: 検索用正規化カード名
-- `biko`: 備考情報（例: 公式のデュエルでは使用できません）
-- `isNotLegalForOfficial`: 公式使用不可フラグ（true/false）
+詳細は[スキーマドキュメント](docs/schema/cards-all.md)を参照してください。
 
 ### 2. cards-detail/ - カード補足情報
 
@@ -82,12 +80,15 @@ spellEffectType | trapEffectType
 - **件数**: 13,753カード（ヘッダー除く）
 - **サイズ**: 13MB
 - **フォーマット**: TSV（タブ区切り）
+- **スキーマ**: [docs/schema/details-all.md](docs/schema/details-all.md)
 
 **カラム**:
 ```
 cardId | cardName | supplementInfo | supplementDate |
 pendulumSupplementInfo | pendulumSupplementDate
 ```
+
+詳細は[スキーマドキュメント](docs/schema/details-all.md)を参照してください。
 
 ### 3. faq/ - FAQ詳細情報
 
@@ -99,11 +100,14 @@ pendulumSupplementInfo | pendulumSupplementDate
 - **件数**: 12,577 FAQ（ヘッダー除く）
 - **サイズ**: 16MB
 - **フォーマット**: TSV（タブ区切り）
+- **スキーマ**: [docs/schema/faq-all.md](docs/schema/faq-all.md)
 
 **カラム**:
 ```
 faqId | question | answer | updatedAt
 ```
+
+詳細は[スキーマドキュメント](docs/schema/faq-all.md)を参照してください。
 
 **補足**: FAQ ID一覧も利用可能
 - `output/data/faqid-all.tsv` (12,578件)
