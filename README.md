@@ -27,6 +27,21 @@ ygo-scraping/
 
 ## 📊 取得済みデータ
 
+### データ配布
+
+**最新データは[GitHub Releases](https://github.com/TomoTom0/ygo-scraping/releases)からダウンロードできます。**
+
+- 📅 **更新頻度**: 毎週日曜日 00:00 UTC（日本時間 月曜日 09:00）自動更新
+- 📦 **形式**: tar.gz圧縮されたTSVファイル
+- 🔄 **保持数**: 最新3世代（古いものは自動削除）
+- 📥 **ダウンロード**: `ygo-data-YYYYMMDD-HHMMSS.tar.gz`
+
+```bash
+# ダウンロード例
+wget https://github.com/TomoTom0/ygo-scraping/releases/latest/download/ygo-data-*.tar.gz
+tar -xzf ygo-data-*.tar.gz
+```
+
 ### 1. cards-data/ - カード基本情報
 
 **ステータス**: ✅ **完了**

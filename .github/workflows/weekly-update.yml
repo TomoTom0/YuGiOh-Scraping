@@ -1,0 +1,129 @@
+name: Weekly Data Update
+
+on:
+  schedule:
+    # 毎週日曜日 00:00 UTC (日本時間 月曜日 09:00)
+    - cron: '0 0 * * 0'
+  workflow_dispatch:  # 手動実行も可能
+
+permissions:
+  contents: write
+
+jobs:
+  update-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6時間（全件取得の場合）
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: dev  # devブランチから実行
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run data update
+        run: |
+          echo "=== データ更新開始 ==="
+          bun run update:all
+          echo "=== データ更新完了 ==="
+
+      - name: Check data files
+        run: |
+          ls -lh output/data/
+          echo "Cards: $(wc -l < output/data/cards-all.tsv) lines"
+          echo "Details: $(wc -l < output/data/details-all.tsv) lines"
+          echo "FAQ: $(wc -l < output/data/faq-all.tsv) lines"
+
+      - name: Create archive
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          ARCHIVE_NAME="ygo-data-${TIMESTAMP}.tar.gz"
+          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+          echo "RELEASE_TAG=data-${TIMESTAMP}" >> $GITHUB_ENV
+          
+          cd output/data
+          tar -czf ../../${ARCHIVE_NAME} *.tsv
+          cd ../..
+          
+          echo "=== アーカイブ作成完了 ==="
+          ls -lh ${ARCHIVE_NAME}
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # リリースノートを生成
+          cat > release-notes.md << EOF
+          ## 遊戯王カードデータベース 週次更新
+          
+          **更新日時**: $(date '+%Y-%m-%d %H:%M:%S UTC')
+          
+          ### 📊 データ統計
+          - カード基本情報: $(wc -l < output/data/cards-all.tsv | xargs) 行
+          - カード詳細情報: $(wc -l < output/data/details-all.tsv | xargs) 行
+          - FAQ情報: $(wc -l < output/data/faq-all.tsv | xargs) 行
+          
+          ### 📦 ファイル内容
+          - \`cards-all.tsv\`: カード基本情報（名前、種族、属性、攻撃力等）
+          - \`details-all.tsv\`: カード補足情報（ルール補足、ペンデュラム補足）
+          - \`faq-all.tsv\`: FAQ詳細（質問・回答・更新日）
+          
+          ### 📥 ダウンロード
+          \`${ARCHIVE_NAME}\` をダウンロードして展開してください。
+          
+          ### 📋 データ形式
+          - エンコーディング: UTF-8
+          - 区切り文字: タブ（TSV）
+          - ソート順: ID降順（新しいものが先頭）
+          EOF
+          
+          # リリース作成
+          gh release create "${RELEASE_TAG}" \
+            "${ARCHIVE_NAME}" \
+            --title "遊戯王データ $(date '+%Y-%m-%d')" \
+            --notes-file release-notes.md
+
+      - name: Keep only latest 3 releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== 古いリリースを削除 ==="
+          
+          # data-* タグのリリースを取得（新しい順）
+          RELEASES=$(gh release list --limit 100 | grep "^data-" | awk '{print $3}')
+          
+          # 配列に変換
+          readarray -t RELEASE_ARRAY <<< "$RELEASES"
+          
+          # 件数確認
+          TOTAL=${#RELEASE_ARRAY[@]}
+          echo "総リリース数: ${TOTAL}"
+          
+          # 4番目以降を削除
+          if [ ${TOTAL} -gt 3 ]; then
+            echo "最新3件を保持し、残りを削除します"
+            for i in $(seq 3 $((TOTAL-1))); do
+              TAG="${RELEASE_ARRAY[$i]}"
+              if [ -n "$TAG" ]; then
+                echo "削除中: ${TAG}"
+                gh release delete "${TAG}" --yes --cleanup-tag || true
+              fi
+            done
+          else
+            echo "リリース数が3件以下のため、削除不要です"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## ✅ データ更新完了" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **リリースタグ**: ${RELEASE_TAG}" >> $GITHUB_STEP_SUMMARY
+          echo "- **アーカイブ**: ${ARCHIVE_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "- **サイズ**: $(ls -lh ${ARCHIVE_NAME} | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
