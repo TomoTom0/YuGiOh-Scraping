@@ -37,9 +37,13 @@ ygo-scraping/
 - 📥 **ダウンロード**: `ygo-data-YYYY.MM.DD.tar.gz`
 
 ```bash
-# ダウンロード例（最新版）
-wget https://github.com/TomoTom0/YuGiOh-Scraping/releases/latest/download/ygo-data-2025.12.19.tar.gz
-tar -xzf ygo-data-2025.12.19.tar.gz
+# ダウンロード例（最新版を自動取得）
+# GitHub Releases の latest を使用すると、常に最新データをダウンロードできます
+wget https://github.com/TomoTom0/YuGiOh-Scraping/releases/latest/download/ygo-data-2025.12.18.tar.gz -O ygo-data-latest.tar.gz
+tar -xzf ygo-data-latest.tar.gz
+
+# または、特定バージョンを指定する場合
+# wget https://github.com/TomoTom0/YuGiOh-Scraping/releases/download/YYYY.MM.DD/ygo-data-YYYY.MM.DD.tar.gz
 ```
 
 **注意**: 初回データは手動でアップロードする必要があります。自動更新は2回目以降（増分取得）で機能します。
@@ -254,14 +258,14 @@ bun run src/faq/fetch-faq-from-list.ts --start-from=4000
 ### 新しい方から件数指定取得の仕組み（--top N）
 
 - **cards**: 発売日順（新しい順）で先頭からN件を取得してマージ
-- **detail**: cards-all.tsvの先頭（新しい順）からN件のcardIdを取得してマージ  
+- **detail**: cards-all.tsvの先頭（新しい順）からN件のcardIdを取得してマージ
 - **faq**: 更新日時順（新しい順）で先頭からN件を取得してマージ
 - 既存データがある場合は重複チェックを行い、新規のみ追加または更新
 
 ### 範囲指定取得の仕組み（--range START LENGTH）
 
 - **cards**: 発売日順（新しい順）でSTART番目からLENGTH件を取得してマージ
-- **detail**: cards-all.tsvのSTART番目からLENGTH件のcardIdを取得してマージ  
+- **detail**: cards-all.tsvのSTART番目からLENGTH件のcardIdを取得してマージ
 - **faq**: 更新日時順（新しい順）でSTART番目からLENGTH件を取得してマージ
 - STARTは0から始まるインデックス（0が最新）
 - 既存データがある場合は重複チェックを行い、新規のみ追加または更新

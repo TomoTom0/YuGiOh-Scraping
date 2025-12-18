@@ -232,70 +232,11 @@ async function fetchSpecificCardIds(cardIds: string[], cookieJar: string): Promi
 }
 
 /**
- * 新規カードのQA情報をTSVにマージ（重複排除・ID順ソート）
+ * カード情報をTSVに書き込み（重複排除・ID順ソート）
  */
-function mergeToTsv(newQaInfos: CardDetail[], tsvPath: string): void {
-  if (newQaInfos.length === 0) {
-    console.log('マージするQA情報がありません。');
-    return;
-  }
-
-  const header = [
-    'cardId', 'cardName', 'supplementInfo', 'supplementDate',
-    'pendulumSupplementInfo', 'pendulumSupplementDate'
-  ].join('\t');
-
-  // cardIdをキーとしたMapを作成
-  const cardMap = new Map<string, string>();
-
-  // 既存データを読み込み
-  if (fs.existsSync(tsvPath)) {
-    const existingContent = fs.readFileSync(tsvPath, 'utf8');
-    const lines = existingContent.split('\n');
-    
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i];
-      if (!line.trim()) continue;
-      
-      const fields = line.split('\t');
-      const cardId = fields[0];
-      if (cardId) {
-        cardMap.set(cardId, line);
-      }
-    }
-  }
-
-  // 新規QA情報で上書き（新しいデータが優先）
-  for (const qa of newQaInfos) {
-    const line = [
-      qa.cardId,
-      escapeForTsv(qa.cardName),
-      escapeForTsv(qa.supplementInfo),
-      escapeForTsv(qa.supplementDate),
-      escapeForTsv(qa.pendulumSupplementInfo),
-      escapeForTsv(qa.pendulumSupplementDate)
-    ].join('\t');
-    cardMap.set(qa.cardId, line);
-  }
-
-  // cardIdを数値として降順ソート（新しいカードが上）
-  const sortedLines = Array.from(cardMap.entries())
-    .sort((a, b) => Number(b[0]) - Number(a[0]))
-    .map(([id, line]) => line);
-
-  // ファイルに書き込み
-  const output = [header, ...sortedLines].join('\n');
-  fs.writeFileSync(tsvPath, output, 'utf8');
-
-  console.log(`${newQaInfos.length} 件のQA情報をマージしました（合計: ${cardMap.size} 件、重複排除・ソート済み）`);
-}
-
-/**
- * 特定カードを既存TSVで更新（重複排除・ID順ソート）
- */
-function updateTsvWithCards(cards: CardDetail[], tsvPath: string): void {
+function updateTsv(cards: CardDetail[], tsvPath: string, messagePrefix: string = ''): void {
   if (cards.length === 0) {
-    console.log('更新するカードがありません。');
+    console.log(`${messagePrefix}更新またはマージするカードがありません。`);
     return;
   }
 
@@ -346,7 +287,21 @@ function updateTsvWithCards(cards: CardDetail[], tsvPath: string): void {
   const output = [header, ...sortedLines].join('\n');
   fs.writeFileSync(tsvPath, output, 'utf8');
 
-  console.log(`✓ ${cards.length} 件のカードを更新しました（合計: ${cardMap.size} 件、重複排除・ソート済み）`);
+  console.log(`${messagePrefix}${cards.length} 件のカード情報を処理しました（合計: ${cardMap.size} 件、重複排除・ソート済み）`);
+}
+
+/**
+ * 新規カードのQA情報をTSVにマージ（重複排除・ID順ソート）
+ */
+function mergeToTsv(newQaInfos: CardDetail[], tsvPath: string): void {
+  updateTsv(newQaInfos, tsvPath);
+}
+
+/**
+ * 特定カードを既存TSVで更新（重複排除・ID順ソート）
+ */
+function updateTsvWithCards(cards: CardDetail[], tsvPath: string): void {
+  updateTsv(cards, tsvPath, '✓ ');
 }
 
 // ============================================================================
