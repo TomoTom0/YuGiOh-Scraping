@@ -1,168 +1,12 @@
-import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { fetchCardDetail } from '../utils/fetchers.js';
+import { escapeForTsv } from '../utils/formatters.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * セッションを確立する（FAQ検索ページにアクセス）
- */
-function establishSession(): Promise<string> {
-  const url = 'https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=1&request_locale=ja';
-
-  console.log('セッションを確立中...');
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      }
-    }, (res) => {
-      let html = '';
-      res.on('data', (chunk) => { html += chunk; });
-      res.on('end', () => {
-        // Set-Cookieヘッダーからセッションを取得
-        const cookies: string[] = [];
-        const setCookieHeaders = res.headers['set-cookie'];
-        if (setCookieHeaders) {
-          setCookieHeaders.forEach(cookie => {
-            const match = cookie.match(/^([^=]+=[^;]+)/);
-            if (match) {
-              cookies.push(match[1]);
-            }
-          });
-        }
-        const cookieJar = cookies.join('; ');
-        console.log(`✓ セッション確立完了 (${cookies.length} cookies)\n`);
-        resolve(cookieJar);
-      });
-    }).on('error', (error) => {
-      console.error('セッション確立エラー:', error);
-      resolve('');
-    });
-  });
-}
-
-/**
- * TSV用にエスケープ
- */
-function escapeForTsv(value: string | undefined): string {
-  if (!value) return '';
-  // タブ、改行、キャリッジリターンを置換
-  return value
-    .replace(/\t/g, '\\t')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\r');
-}
-
-/**
- * 待機
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * QAページから補足情報を取得
- */
-async function fetchQAPage(cardId: string, cookieJar: string): Promise<{
-  cardId: string;
-  cardName: string;
-  supplementInfo?: string;
-  supplementDate?: string;
-  pendulumSupplementInfo?: string;
-  pendulumSupplementDate?: string;
-} | null> {
-  const url = `https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=4&cid=${cardId}&request_locale=ja`;
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Cookie': cookieJar
-      }
-    }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk) => { chunks.push(chunk); });
-      res.on('end', () => {
-        const html = Buffer.concat(chunks).toString('utf8');
-        try {
-          const dom = new JSDOM(html, { url });
-          const doc = dom.window.document as unknown as Document;
-
-          // タイトルからカード名を抽出
-          const titleElem = doc.querySelector('title');
-          const title = titleElem?.textContent || '';
-          const cardName = title.split('|')[0]?.trim() || '';
-
-          // 補足情報を取得
-          let supplementInfo: string | undefined = undefined;
-          let supplementDate: string | undefined = undefined;
-          let pendulumSupplementInfo: string | undefined = undefined;
-          let pendulumSupplementDate: string | undefined = undefined;
-
-          const supplementElems = doc.querySelectorAll('.supplement');
-
-          supplementElems.forEach(supplementElem => {
-            const textElem = supplementElem.querySelector('.text');
-            if (!textElem) return;
-
-            const textId = textElem.id;
-
-            // 日付を取得
-            const dateElem = supplementElem.querySelector('.title .update');
-            const date = dateElem?.textContent?.trim() || undefined;
-
-            // テキストを取得（改行を保持、カードリンクをテンプレート形式に変換）
-            const cloned = textElem.cloneNode(true) as HTMLElement;
-            cloned.querySelectorAll('br').forEach(br => {
-              br.replaceWith('\n');
-            });
-
-            // カードリンクを{{カード名|cid}}形式に変換
-            cloned.querySelectorAll('a[href*="cid="]').forEach(link => {
-              const href = link.getAttribute('href') || '';
-              const match = href.match(/[?&]cid=(\d+)/);
-              if (match && match[1]) {
-                const linkCardId = match[1];
-                const cardLinkName = link.textContent?.trim() || '';
-                link.replaceWith(`{{${cardLinkName}|${linkCardId}}}`);
-              }
-            });
-
-            const text = cloned.textContent?.trim() || undefined;
-
-            // IDで判別
-            if (textId === 'pen_supplement') {
-              pendulumSupplementInfo = text;
-              pendulumSupplementDate = date;
-            } else if (textId === 'supplement') {
-              supplementInfo = text;
-              supplementDate = date;
-            }
-          });
-
-          resolve({
-            cardId,
-            cardName,
-            supplementInfo,
-            supplementDate,
-            pendulumSupplementInfo,
-            pendulumSupplementDate
-          });
-        } catch (error) {
-          console.error(`Parse error for card ${cardId}:`, error);
-          resolve(null);
-        }
-      });
-    }).on('error', (error) => {
-      console.error(`Request error for card ${cardId}:`, error);
-      resolve(null);
-    });
-  });
-}
 
 /**
  * メイン処理
@@ -307,7 +151,7 @@ async function main() {
       process.stdout.write(`\r${progress} Fetching: ${cardId}...`);
     }
 
-    const qaData = await fetchQAPage(cardId, cookieJar);
+    const qaData = await fetchCardDetail(cardId, cookieJar);
 
     if (qaData) {
       tsvLines.push([

@@ -3,55 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import { establishSession } from '../utils/session.js';
+import { sleep } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * セッションを確立する（FAQ検索ページにアクセス）
- */
-function establishSession(): Promise<string> {
-  const url = 'https://www.db.yugioh-card.com/yugiohdb/faq_search.action?ope=1&request_locale=ja';
-
-  console.log('セッションを確立中...');
-
-  return new Promise((resolve) => {
-    https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      }
-    }, (res) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (chunk) => { chunks.push(chunk); });
-      res.on('end', () => {
-        const html = Buffer.concat(chunks).toString('utf8');
-        // Set-Cookieヘッダーからセッションを取得
-        const cookies: string[] = [];
-        const setCookieHeaders = res.headers['set-cookie'];
-        if (setCookieHeaders) {
-          setCookieHeaders.forEach(cookie => {
-            const match = cookie.match(/^([^=]+=[^;]+)/);
-            if (match) {
-              cookies.push(match[1]);
-            }
-          });
-        }
-        const cookieJar = cookies.join('; ');
-        console.log(`✓ セッション確立完了 (${cookies.length} cookies)\n`);
-        resolve(cookieJar);
-      });
-    }).on('error', (error) => {
-      console.error('セッション確立エラー:', error);
-      resolve('');
-    });
-  });
-}
-
-/**
- * 待機
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 /**
  * QA一覧ページからfaqIdリストを取得
