@@ -85,27 +85,24 @@ jobs:
         run: |
           # リリースノートを生成
           cat > release-notes.md << EOF
-          ## 遊戯王カードデータベース 週次更新
-          
-          **更新日時**: $(date '+%Y-%m-%d %H:%M:%S UTC')
-          
-          ### 📊 データ統計
-          - カード基本情報: $(wc -l < output/data/cards-all.tsv | xargs) 行
-          - カード詳細情報: $(wc -l < output/data/details-all.tsv | xargs) 行
-          - FAQ情報: $(wc -l < output/data/faq-all.tsv | xargs) 行
-          
-          ### 📦 ファイル内容
-          - \`cards-all.tsv\`: カード基本情報（名前、種族、属性、攻撃力等）
-          - \`details-all.tsv\`: カード補足情報（ルール補足、ペンデュラム補足）
-          - \`faq-all.tsv\`: FAQ詳細（質問・回答・更新日）
-          
-          ### 📥 ダウンロード
-          \`${ARCHIVE_NAME}\` をダウンロードして展開してください。
-          
-          ### 📋 データ形式
-          - エンコーディング: UTF-8
-          - 区切り文字: タブ（TSV）
-          - ソート順: ID降順（新しいものが先頭）
+          ## Data Statistics
+
+          Updated at: $(date '+%Y-%m-%d %H:%M:%S UTC')
+
+          ### Data Counts
+          - cards-all.tsv: $(wc -l < output/data/cards-all.tsv | xargs) lines
+          - details-all.tsv: $(wc -l < output/data/details-all.tsv | xargs) lines
+          - faq-all.tsv: $(wc -l < output/data/faq-all.tsv | xargs) lines
+
+          ### File Contents
+          - \`cards-all.tsv\`: Card information (name, type, attribute, attack power, etc.)
+          - \`details-all.tsv\`: Card supplementary information (rule notes, pendulum notes)
+          - \`faq-all.tsv\`: FAQ details (questions, answers, update dates)
+
+          ### Data Format
+          - Encoding: UTF-8
+          - Delimiter: Tab (TSV)
+          - Sort order: ID descending (newest first)
           EOF
           
           # 既存のリリースがあるか確認
@@ -120,7 +117,7 @@ jobs:
             # リリース作成
             gh release create "${RELEASE_TAG}" \
               "${ARCHIVE_NAME}" \
-              --title "遊戯王データ ${RELEASE_TAG}" \
+              --title "Neuron Data on ${RELEASE_TAG}" \
               --notes-file release-notes.md
           fi
 
