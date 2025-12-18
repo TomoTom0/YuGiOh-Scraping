@@ -33,7 +33,7 @@ jobs:
           mkdir -p output/data
           
           # 最新リリースのタグを取得
-          LATEST_TAG=$(gh release list --limit 1 | grep -E "^[0-9]{4}\.[0-9]{2}\.[0-9]{2}" | awk '{print $1}')
+          LATEST_TAG=$(gh release list --limit 1 --json tag -q '.[0].tag')
           
           if [ -z "$LATEST_TAG" ]; then
             echo "❌ エラー: 前回リリースが見つかりません"
@@ -120,9 +120,8 @@ jobs:
         run: |
           echo "=== 古いリリースを削除 ==="
           
-          # 日付形式のタグのリリースを取得（新しい順）
-          # 形式: YYYY.MM.DD
-          RELEASES=$(gh release list --limit 100 | grep -E "^[0-9]{4}\.[0-9]{2}\.[0-9]{2}" | awk '{print $1}')
+          # リリースタグを取得（新しい順）
+          RELEASES=$(gh release list --limit 100 --json tag -q '.[].tag')
           
           # 配列に変換
           readarray -t RELEASE_ARRAY <<< "$RELEASES"
