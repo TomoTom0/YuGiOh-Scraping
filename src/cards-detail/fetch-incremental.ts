@@ -315,7 +315,7 @@ async function main() {
   const scriptsDir = __dirname;
   const dataDir = path.join(scriptsDir, '../..', 'output', 'data');
   const cardsPath = path.join(dataDir, 'cards-all.tsv');
-  const tsvPath = path.join(dataDir, 'details-all.tsv');
+  const tsvPath = path.join(dataDir, 'detail-all.tsv');
 
   // 出力ディレクトリ作成
   if (!fs.existsSync(dataDir)) {

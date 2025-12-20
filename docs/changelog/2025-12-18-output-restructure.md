@@ -29,7 +29,7 @@ output/
 output/
 ├── data/
 │   ├── cards-all.tsv
-│   ├── details-all.tsv  (旧: qa-all.tsv)
+│   ├── detail-all.tsv  (旧: qa-all.tsv)
 │   └── faq-all.tsv
 └── .temp/
     ├── cards-detail/
@@ -38,7 +38,7 @@ output/
 
 ### ファイル名の変更
 
-- `output/cards-detail/qa-all.tsv` → `output/data/details-all.tsv`
+- `output/cards-detail/qa-all.tsv` → `output/data/detail-all.tsv`
 
 ### 一時ファイル配置の変更
 
@@ -71,7 +71,7 @@ mkdir -p output/data
 
 # ファイルを移動
 mv output/cards-data/cards-all.tsv output/data/
-mv output/cards-detail/qa-all.tsv output/data/details-all.tsv
+mv output/cards-detail/qa-all.tsv output/data/detail-all.tsv
 mv output/faq/faq-all.tsv output/data/
 
 # 古いディレクトリを削除
@@ -81,7 +81,7 @@ rm -rf output/cards-data output/cards-detail output/faq
 ## 変更理由
 
 1. **シンプル化**: 3つのサブディレクトリを1つに統一
-2. **明確化**: `qa-all.tsv` → `details-all.tsv` で内容をより明確に表現
+2. **明確化**: `qa-all.tsv` → `detail-all.tsv` で内容をより明確に表現
 3. **一貫性**: 一時ファイルを`output/.temp/`に集約
 
 ## 後方互換性

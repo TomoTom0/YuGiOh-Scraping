@@ -62,22 +62,30 @@ jobs:
         run: |
           ls -lh output/data/
           echo "Cards: $(wc -l < output/data/cards-all.tsv) lines"
-          echo "Details: $(wc -l < output/data/details-all.tsv) lines"
+          echo "Details: $(wc -l < output/data/detail-all.tsv) lines"
           echo "FAQ: $(wc -l < output/data/faq-all.tsv) lines"
 
-      - name: Create archive
+      - name: Create archives
         run: |
           DATE=$(date -u +%Y.%m.%d)
-          ARCHIVE_NAME="ygo-data-${DATE}.tar.gz"
-          echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+          TAR_GZ_NAME="ygo-data-${DATE}.tar.gz"
+          ZIP_NAME="ygo-data-${DATE}.zip"
+          echo "TAR_GZ_NAME=${TAR_GZ_NAME}" >> $GITHUB_ENV
+          echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
           echo "RELEASE_TAG=${DATE}" >> $GITHUB_ENV
-          
+
           cd output/data
-          tar -czf ../../${ARCHIVE_NAME} *.tsv
+
+          # Create tar.gz archive
+          tar -czf ../../${TAR_GZ_NAME} *.tsv
+
+          # Create zip archive
+          zip -q ../../${ZIP_NAME} *.tsv
+
           cd ../..
-          
+
           echo "=== アーカイブ作成完了 ==="
-          ls -lh ${ARCHIVE_NAME}
+          ls -lh ${TAR_GZ_NAME} ${ZIP_NAME}
 
       - name: Create Release
         env:
@@ -91,12 +99,12 @@ jobs:
 
           ### Data Counts
           - cards-all.tsv: $(wc -l < output/data/cards-all.tsv | xargs) lines
-          - details-all.tsv: $(wc -l < output/data/details-all.tsv | xargs) lines
+          - detail-all.tsv: $(wc -l < output/data/detail-all.tsv | xargs) lines
           - faq-all.tsv: $(wc -l < output/data/faq-all.tsv | xargs) lines
 
           ### File Contents
           - \`cards-all.tsv\`: Card information (name, type, attribute, attack power, etc.)
-          - \`details-all.tsv\`: Card supplementary information (rule notes, pendulum notes)
+          - \`detail-all.tsv\`: Card supplementary information (rule notes, pendulum notes)
           - \`faq-all.tsv\`: FAQ details (questions, answers, update dates)
 
           ### Data Format
@@ -110,13 +118,14 @@ jobs:
             echo "既存のリリースを更新します: ${RELEASE_TAG}"
             # 既存のアセットを削除
             gh release delete-asset "${RELEASE_TAG}" "ygo-data-${RELEASE_TAG}.tar.gz" 2>/dev/null || true
+            gh release delete-asset "${RELEASE_TAG}" "ygo-data-${RELEASE_TAG}.zip" 2>/dev/null || true
             # 新しいアセットをアップロード
-            gh release upload "${RELEASE_TAG}" "${ARCHIVE_NAME}"
+            gh release upload "${RELEASE_TAG}" "${TAR_GZ_NAME}" "${ZIP_NAME}"
           else
             echo "新しいリリースを作成します: ${RELEASE_TAG}"
             # リリース作成
             gh release create "${RELEASE_TAG}" \
-              "${ARCHIVE_NAME}" \
+              "${TAR_GZ_NAME}" "${ZIP_NAME}" \
               --title "Neuron Data on ${RELEASE_TAG}" \
               --notes-file release-notes.md
           fi
@@ -156,5 +165,5 @@ jobs:
           echo "## ✅ データ更新完了" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **リリースタグ**: ${RELEASE_TAG}" >> $GITHUB_STEP_SUMMARY
-          echo "- **アーカイブ**: ${ARCHIVE_NAME}" >> $GITHUB_STEP_SUMMARY
-          echo "- **サイズ**: $(ls -lh ${ARCHIVE_NAME} | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+          echo "- **tar.gz**: ${TAR_GZ_NAME} ($(ls -lh ${TAR_GZ_NAME} | awk '{print $5}'))" >> $GITHUB_STEP_SUMMARY
+          echo "- **zip**: ${ZIP_NAME} ($(ls -lh ${ZIP_NAME} | awk '{print $5}'))" >> $GITHUB_STEP_SUMMARY
