@@ -76,11 +76,11 @@ spellEffectType | trapEffectType
 
 各カードのルール補足情報とペンデュラム補足情報
 
-- **出力**: `output/data/details-all.tsv`
+- **出力**: `output/data/detail-all.tsv`
 - **件数**: 13,753カード（ヘッダー除く）
 - **サイズ**: 13MB
 - **フォーマット**: TSV（タブ区切り）
-- **スキーマ**: [docs/schema/details-all.md](docs/schema/details-all.md)
+- **スキーマ**: [docs/schema/detail-all.md](docs/schema/detail-all.md)
 
 **カラム**:
 ```
@@ -88,7 +88,7 @@ cardId | cardName | supplementInfo | supplementDate |
 pendulumSupplementInfo | pendulumSupplementDate
 ```
 
-詳細は[スキーマドキュメント](docs/schema/details-all.md)を参照してください。
+詳細は[スキーマドキュメント](docs/schema/detail-all.md)を参照してください。
 
 ### 3. faq/ - FAQ詳細情報
 
@@ -199,7 +199,7 @@ bun run update:faq --force-all
 #### 出力先
 
 - カード基本情報: `output/data/cards-all.tsv`
-- カード詳細情報: `output/data/details-all.tsv`
+- カード詳細情報: `output/data/detail-all.tsv`
 - FAQ情報: `output/data/faq-all.tsv`
 
 #### 中断時の再開
@@ -325,11 +325,11 @@ src/
 output/
 ├── data/
 │   ├── cards-all.tsv           カード基本情報（最終出力）
-│   ├── details-all.tsv         カード補足情報（最終出力）
+│   ├── detail-all.tsv         カード補足情報（最終出力）
 │   ├── faq-all.tsv             FAQ詳細（最終出力）
 │   └── faqid-all.tsv           FAQ ID一覧（オプション）
 └── .temp/                      一時ファイル（1000件ごと）
-    ├── cards-detail/           details-all-temp-*.tsv
+    ├── cards-detail/           detail-all-temp-*.tsv
     └── faq/                    faq-all-temp-*.tsv
 ```
 
@@ -365,7 +365,7 @@ output/
 ```bash
 # 最新の中間ファイルを確認
 ls -lht output/.temp/cards-detail/*.tsv | head -1
-# 例: details-all-temp-8000.tsv が最新の場合
+# 例: detail-all-temp-8000.tsv が最新の場合
 
 # 8000件目から再開
 bun run src/cards-detail/fetch-qa-all.ts --start-from=8000
@@ -376,7 +376,7 @@ bun run src/cards-detail/fetch-qa-all.ts --start-from=8000
 ```bash
 # 行数確認（ヘッダー含む）
 wc -l output/data/cards-all.tsv      # 13754行
-wc -l output/data/details-all.tsv    # 13754行
+wc -l output/data/detail-all.tsv    # 13754行
 wc -l output/data/faq-all.tsv        # 12578行
 ```
 
@@ -407,7 +407,7 @@ wc -l output/data/faq-all.tsv        # 12578行
 - ✅ 統一的なコマンド体系に変更（`update:cards`, `update:all`等）
 - ✅ 出力ディレクトリ構造を変更
   - 全TSVファイルを`output/data/`に統一
-  - `qa-all.tsv` → `details-all.tsv` にリネーム
+  - `qa-all.tsv` → `detail-all.tsv` にリネーム
   - 一時ファイルを`output/.temp/`に集約
   - 詳細: `docs/changelog/2025-12-18-output-restructure.md`
 

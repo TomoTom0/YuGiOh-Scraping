@@ -13,7 +13,7 @@ bun run update:all
 
 これで `output/data/` に以下のファイルが生成されます：
 - `cards-all.tsv`
-- `details-all.tsv`
+- `detail-all.tsv`
 - `faq-all.tsv`
 
 ### 2. アーカイブ作成
@@ -42,12 +42,12 @@ gh release create ${DATE} \
 
 ## データ統計
 - カード基本情報: $(wc -l < output/data/cards-all.tsv) 行
-- カード詳細情報: $(wc -l < output/data/details-all.tsv) 行
+- カード詳細情報: $(wc -l < output/data/detail-all.tsv) 行
 - FAQ情報: $(wc -l < output/data/faq-all.tsv) 行
 
 ## ファイル内容
 - \`cards-all.tsv\`: カード基本情報（名前、種族、属性、攻撃力等）
-- \`details-all.tsv\`: カード補足情報（ルール補足、ペンデュラム補足）
+- \`detail-all.tsv\`: カード補足情報（ルール補足、ペンデュラム補足）
 - \`faq-all.tsv\`: FAQ詳細（質問・回答・更新日）
 
 ## データ形式
