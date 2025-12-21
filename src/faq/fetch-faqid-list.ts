@@ -9,6 +9,15 @@ import { sleep } from '../utils/helpers.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * ランダム遅延（1000-3000ms）
+ */
+function randomDelay(): Promise<void> {
+  const delay = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
+  console.log(`  待機: ${delay}ms`);
+  return sleep(delay);
+}
+
+/**
  * QA一覧ページからfaqIdリストを取得
  */
 async function fetchFaqIdListFromPage(page: number, rp: number, cookieJar: string): Promise<string[]> {
@@ -118,7 +127,7 @@ async function main() {
 
     // サーバーに負荷をかけないよう待機（1秒）
     if (page < totalPages) {
-      await sleep(1000);
+      await randomDelay();
     }
   }
 

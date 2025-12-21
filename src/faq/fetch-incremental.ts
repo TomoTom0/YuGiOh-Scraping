@@ -19,7 +19,8 @@ const CONFIG = {
   RESULTS_PER_PAGE: 100,
   SORT_UPDATED: 2, // 更新日時順（新しい順）
   LOCALE: 'ja',
-  DELAY_MS: 1000,
+  DELAY_MIN_MS: 1000,
+  DELAY_MAX_MS: 3000,
 };
 
 // ============================================================================
@@ -43,6 +44,15 @@ interface FetchResult {
 // ============================================================================
 // ユーティリティ関数
 // ============================================================================
+
+/**
+ * ランダム遅延（1000-3000ms）
+ */
+function randomDelay(): Promise<void> {
+  const delay = Math.floor(Math.random() * (CONFIG.DELAY_MAX_MS - CONFIG.DELAY_MIN_MS + 1)) + CONFIG.DELAY_MIN_MS;
+  console.log(`  待機: ${delay}ms`);
+  return sleep(delay);
+}
 
 /**
  * 既存TSVからfaqIdと更新日時をMapで読み込む
@@ -112,7 +122,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
         }
 
         if (i < toFetch.length - 1 || faqs.length < n) {
-          await sleep(CONFIG.DELAY_MS);
+          await randomDelay();
         }
       }
 
@@ -129,7 +139,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -183,7 +193,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
         }
 
         currentIndex++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay();
       }
 
       console.log(`  取得: (合計: ${faqs.length}/${length})`);
@@ -199,7 +209,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -296,7 +306,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
             newFaqs.push(detail);
             newInPage++;
           }
-          await sleep(CONFIG.DELAY_MS);
+          await randomDelay();
         }
       }
 
@@ -308,7 +318,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
           break;
         }
         page++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay();
       }
 
     } catch (error) {
@@ -405,7 +415,7 @@ async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise
     }
 
     if (i < faqIds.length - 1) {
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
     }
   }
 

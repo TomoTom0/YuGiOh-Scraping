@@ -13,7 +13,8 @@ const CONFIG = {
   RESULTS_PER_PAGE: 100, // 増分取得では少なめに
   SORT_NEWER: 21, // 発売日(新しい順)
   LOCALE: 'ja',
-  DELAY_MS: 1000, // リクエスト間隔
+  DELAY_MIN_MS: 1000, // リクエスト間隔最小値
+  DELAY_MAX_MS: 3000, // リクエスト間隔最大値
 };
 
 // ============================================================================
@@ -39,6 +40,15 @@ type CardInfo = ReturnType<typeof parseSearchResultRow> & {};
  */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * ランダム遅延（1000-3000ms）
+ */
+function randomDelay(): Promise<void> {
+  const delay = Math.floor(Math.random() * (CONFIG.DELAY_MAX_MS - CONFIG.DELAY_MIN_MS + 1)) + CONFIG.DELAY_MIN_MS;
+  console.log(`  待機: ${delay}ms`);
+  return sleep(delay);
 }
 
 /**
@@ -155,7 +165,7 @@ async function fetchTopN(n: number): Promise<FetchResult> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -227,7 +237,7 @@ async function fetchRange(start: number, length: number): Promise<FetchResult> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -295,7 +305,7 @@ async function fetchIncremental(existingCardIds: Set<string>): Promise<FetchResu
         }
 
         page++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay();
       }
 
     } catch (error) {

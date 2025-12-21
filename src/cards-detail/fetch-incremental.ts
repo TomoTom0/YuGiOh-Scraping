@@ -13,12 +13,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ============================================================================
 
 const CONFIG = {
-  DELAY_MS: 1000,
+  DELAY_MIN_MS: 1000,
+  DELAY_MAX_MS: 3000,
 };
 
 // ============================================================================
 // ユーティリティ関数
 // ============================================================================
+
+/**
+ * ランダム遅延（1000-3000ms）
+ */
+function randomDelay(): Promise<void> {
+  const delay = Math.floor(Math.random() * (CONFIG.DELAY_MAX_MS - CONFIG.DELAY_MIN_MS + 1)) + CONFIG.DELAY_MIN_MS;
+  console.log(`  待機: ${delay}ms`);
+  return sleep(delay);
+}
 
 /**
  * 既存TSVからcardIdセットを読み込む
@@ -128,7 +138,7 @@ async function fetchTopN(n: number, cardsPath: string, cookieJar: string): Promi
     }
 
     if (i < topCardIds.length - 1) {
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
     }
   }
 
@@ -179,7 +189,7 @@ async function fetchRange(start: number, length: number, cardsPath: string, cook
     }
 
     if (i < rangeCardIds.length - 1) {
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
     }
   }
 
@@ -220,7 +230,7 @@ async function fetchSpecificCardIds(cardIds: string[], cookieJar: string): Promi
     }
 
     if (i < cardIds.length - 1) {
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay();
     }
   }
 
@@ -395,7 +405,7 @@ async function main() {
 
       // サーバー負荷軽減
       if (i < newCardIds.length - 1) {
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay();
       }
     }
 
