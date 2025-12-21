@@ -626,6 +626,8 @@ function cardInfoToTsvRow(card: CardInfo): string {
     fields.push(escapeForTsv(monster.pendulumScale !== undefined ? monster.pendulumScale.toString() : ''));
     fields.push(escapeForTsv(monster.pendulumText || ''));
     fields.push(escapeForTsv(monster.isExtraDeck.toString()));
+    fields.push(''); // spellEffectType
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'spell') {
     const spell = card as SpellCard;
     fields.push(''); // attribute
@@ -640,6 +642,7 @@ function cardInfoToTsvRow(card: CardInfo): string {
     fields.push(''); // pendulumText
     fields.push(''); // isExtraDeck
     fields.push(escapeForTsv(spell.effectType || ''));
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'trap') {
     const trap = card as TrapCard;
     fields.push(''); // attribute
