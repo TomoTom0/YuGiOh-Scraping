@@ -1,53 +1,53 @@
-# cards-all.tsv Schema
+# cards-all.tsv スキーマ
 
-Card basic information and attributes.
+カード基本情報と属性データ。
 
-## Columns
+## カラム
 
-| Column Name | Type | Description | Example |
+| カラム名 | 型 | 説明 | 例 |
 |-------------|------|-------------|---------|
-| cardType | string | Card type (monster/spell/trap) | `monster` |
-| name | string | Official card name | `ミラクル・エクスクルーダー` |
-| nameModified | string | Card name without punctuation for searching | `ミラクルエクスクルーダー` |
-| ruby | string | Furigana (reading guide) | `ミラクル・エクスクルーダー` |
-| cardId | number | Unique card identifier | `22593` |
-| ciid | number | Card image ID | `1` |
-| imgs | JSON array | Card images with hash | `[{"ciid":"1","imgHash":"Y94JqtKC23Lbh1W5UB_D-Q"}]` |
-| text | string | Card effect text | `このカード名はルール上「E・HERO」カードとしても扱う。...` |
-| biko | string | Card supplement notes | Empty string if none |
-| isNotLegalForOfficial | boolean | Whether card is legal for official play | `false` |
-| attribute | string | Monster attribute (earth/water/fire/wind/light/dark/divine) | `earth` |
-| levelType | string | Level type (level/rank/link) | `level` |
-| levelValue | number | Monster level/rank/link rating | `3` |
-| race | string | Monster race/type | `spellcaster` |
-| monsterTypes | JSON array | Monster types (effect/normal/fusion/etc) | `["effect"]` |
-| atk | number | Attack power | `400` |
-| def | number | Defense power | `400` |
-| linkMarkers | JSON array | Link markers (empty for non-link monsters) | `[]` |
-| pendulumScale | number | Pendulum scale (empty for non-pendulum) | `""` |
-| pendulumText | string | Pendulum effect text | `""` |
-| isExtraDeck | boolean | Whether card belongs to Extra Deck | `false` |
-| spellEffectType | string | Spell card type (quick-play/field/ritual/etc) | `""` |
-| trapEffectType | string | Trap card type (normal/continuous/counter) | `""` |
+| cardType | string | カード種類 (monster/spell/trap) | `monster` |
+| name | string | 公式カード名 | `ミラクル・エクスクルーダー` |
+| nameModified | string | 検索用の記号除去カード名 | `ミラクルエクスクルーダー` |
+| ruby | string | 読み仮名 | `ミラクル・エクスクルーダー` |
+| cardId | number | カード固有識別番号 | `22593` |
+| ciid | number | カード画像ID | `1` |
+| imgs | JSON配列 | ハッシュ付きカード画像 | `[{"ciid":"1","imgHash":"Y94JqtKC23Lbh1W5UB_D-Q"}]` |
+| text | string | カード効果テキスト | `このカード名はルール上「E・HERO」カードとしても扱う。...` |
+| biko | string | カード補足説明 | なければ空文字列 |
+| isNotLegalForOfficial | boolean | 公式大会で使用不可かどうか | `false` |
+| attribute | string | モンスター属性 (earth/water/fire/wind/light/dark/divine) | `earth` |
+| levelType | string | レベル種別 (level/rank/link) | `level` |
+| levelValue | number | モンスターレベル/ランク/リンク値 | `3` |
+| race | string | モンスター種族 | `spellcaster` |
+| monsterTypes | JSON配列 | モンスタータイプ (effect/normal/fusion等) | `["effect"]` |
+| atk | number | 攻撃力 | `400` |
+| def | number | 守備力 | `400` |
+| linkMarkers | JSON配列 | リンクマーカー (リンク以外は空配列) | `[]` |
+| pendulumScale | number | ペンデュラムスケール (非ペンデュラムは空) | `""` |
+| pendulumText | string | ペンデュラム効果テキスト | `""` |
+| isExtraDeck | boolean | エクストラデッキカードかどうか | `false` |
+| spellEffectType | string | 魔法カード種別 (速攻/フィールド/儀式等) | `""` |
+| trapEffectType | string | 罠カード種別 (通常/永続/カウンター) | `""` |
 
-## Data Types
+## データ型
 
-### JSON Arrays
-Some fields contain JSON-formatted arrays:
-- `imgs`: Array of image objects with `ciid` and `imgHash`
-- `monsterTypes`: Array of monster type strings
-- `linkMarkers`: Array of link marker directions
+### JSON配列
+一部のフィールドはJSON形式の配列を含みます：
+- `imgs`: `ciid` と `imgHash` を持つ画像オブジェクトの配列
+- `monsterTypes`: モンスタータイプの文字列配列
+- `linkMarkers`: リンクマーカー方向の配列
 
-### Boolean Values
-- `true` / `false` (lowercase)
+### 真偽値
+- `true` / `false` (小文字)
 
-### Empty Values
-Fields may be empty strings (`""`) when not applicable to the card type.
+### 空値
+カードタイプに該当しない場合、フィールドは空文字列 (`""`) になります。
 
-## Sorting
+## ソート順
 
-Data is sorted by `cardId` in descending order (newest cards first).
+データは `cardId` の降順（新しいカードが先）でソートされています。
 
-## Character Encoding
+## 文字エンコーディング
 
-All text is encoded in UTF-8.
+全テキストは UTF-8 でエンコードされています。

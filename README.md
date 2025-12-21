@@ -208,7 +208,7 @@ bun run update:faq --force-all
 
 ```bash
 # カード詳細を6000件目から再開
-bun run src/cards-detail/fetch-qa-all.ts --start-from=6000
+bun run src/cards-detail/fetch-detail-all.ts --start-from=6000
 
 # FAQを4000件目から再開
 bun run src/faq/fetch-faq-from-list.ts --start-from=4000
@@ -368,7 +368,7 @@ ls -lht output/.temp/cards-detail/*.tsv | head -1
 # 例: detail-all-temp-8000.tsv が最新の場合
 
 # 8000件目から再開
-bun run src/cards-detail/fetch-qa-all.ts --start-from=8000
+bun run src/cards-detail/fetch-detail-all.ts --start-from=8000
 ```
 
 ### データの整合性確認

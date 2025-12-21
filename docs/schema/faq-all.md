@@ -1,47 +1,47 @@
-# faq-all.tsv Schema
+# faq-all.tsv スキーマ
 
-FAQ (Frequently Asked Questions) about card rulings and clarifications.
+カード裁定とルール補足に関するFAQ（よくある質問）データ。
 
-## Columns
+## カラム
 
-| Column Name | Type | Description | Example |
+| カラム名 | 型 | 説明 | 例 |
 |-------------|------|-------------|---------|
-| faqId | number | Unique FAQ identifier | `24256` |
-| question | string | FAQ question text | `自分が「{{増援\|5328}}」を発動し...` |
-| answer | string | FAQ answer text | `ターンプレイヤーである自分が先に...` |
-| updatedAt | date | Date when FAQ was last updated (YYYY-MM-DD) | `2025-12-11` |
+| faqId | number | FAQ固有識別番号 | `24256` |
+| question | string | FAQ質問テキスト | `自分が「{{増援\|5328}}」を発動し...` |
+| answer | string | FAQ回答テキスト | `ターンプレイヤーである自分が先に...` |
+| updatedAt | date | FAQの最終更新日 (YYYY-MM-DD) | `2025-12-11` |
 
-## Data Types
+## データ型
 
-### Dates
-Dates are in ISO 8601 format: `YYYY-MM-DD`
+### 日付
+日付は ISO 8601 形式: `YYYY-MM-DD`
 
-### Text Fields
-- `question`: FAQ question (may contain multiple lines with `\n`)
-- `answer`: FAQ answer (may contain multiple lines with `\n`)
-- Both may contain wiki-style markup with `{{cardName|cardId}}`
+### テキストフィールド
+- `question`: FAQ質問 (複数行を `\n` で含む場合があります)
+- `answer`: FAQ回答 (複数行を `\n` で含む場合があります)
+- 両方とも `{{カード名|cardId}}` 形式のWikiスタイルマークアップを含む場合があります
 
-### Wiki-style Markup
-Card references use the format: `{{cardName|cardId}}`
+### Wikiスタイルマークアップ
+カード参照は次の形式を使用します: `{{カード名|cardId}}`
 
-Example: `{{増援|5328}}` refers to the card "増援" (card ID 5328)
+例: `{{増援|5328}}` は「増援」（カードID 5328）を参照します
 
-## Text Content
+## テキスト内容
 
-### Question Field
-Contains the FAQ question, often referring to specific card effects and game situations.
+### 質問フィールド
+特定のカード効果やゲーム状況に関するFAQ質問を含みます。
 
-### Answer Field
-Contains the official ruling or clarification for the question. May include:
-- Direct rulings
-- Explanations of game mechanics
-- Priority rules
-- Complex interactions between multiple cards
+### 回答フィールド
+質問に対する公式裁定や説明を含みます。以下を含む場合があります：
+- 直接的な裁定
+- ゲームメカニクスの説明
+- 優先権ルール
+- 複数カード間の複雑な相互作用
 
-## Sorting
+## ソート順
 
-Data is sorted by `faqId` in descending order (newest FAQs first).
+データは `faqId` の降順（新しいFAQが先）でソートされています。
 
-## Character Encoding
+## 文字エンコーディング
 
-All text is encoded in UTF-8.
+全テキストは UTF-8 でエンコードされています。
