@@ -38,7 +38,7 @@ const TASKS: Record<string, TaskConfig> = {
   detail: {
     name: 'カード詳細情報',
     incrementalScript: 'src/cards-detail/fetch-incremental.ts',
-    fullScript: 'src/cards-detail/fetch-qa-all.ts',
+    fullScript: 'src/cards-detail/fetch-detail-all.ts',
     description: 'カード詳細情報の増分取得'
   },
   faq: {
