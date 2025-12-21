@@ -4,18 +4,9 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
 import { establishSession } from '../utils/session.js';
-import { sleep } from '../utils/helpers.js';
+import { randomDelay } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-/**
- * ランダム遅延（1000-3000ms）
- */
-function randomDelay(): Promise<void> {
-  const delay = Math.floor(Math.random() * (3000 - 1000 + 1)) + 1000;
-  console.log(`  待機: ${delay}ms`);
-  return sleep(delay);
-}
 
 /**
  * QA一覧ページからfaqIdリストを取得

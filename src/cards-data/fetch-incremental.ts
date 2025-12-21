@@ -2,7 +2,7 @@ import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseSearchResultRow, extractImageInfo } from './parse-to-tsv';
-import { parseScrapingMode, type ScrapingMode } from '../utils/helpers.js';
+import { parseScrapingMode, randomDelay, type ScrapingMode } from '../utils/helpers.js';
 
 // ============================================================================
 // 設定
@@ -40,15 +40,6 @@ type CardInfo = ReturnType<typeof parseSearchResultRow> & {};
  */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * ランダム遅延（1000-3000ms）
- */
-function randomDelay(): Promise<void> {
-  const delay = Math.floor(Math.random() * (CONFIG.DELAY_MAX_MS - CONFIG.DELAY_MIN_MS + 1)) + CONFIG.DELAY_MIN_MS;
-  console.log(`  待機: ${delay}ms`);
-  return sleep(delay);
 }
 
 /**

@@ -8,6 +8,16 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * ランダム遅延（1000-3000ms）
+ * 公式サイトへのAPI通信時に使用
+ */
+export function randomDelay(minMs: number = 1000, maxMs: number = 3000): Promise<void> {
+  const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  console.log(`  待機: ${delay}ms`);
+  return sleep(delay);
+}
+
+/**
  * スクレイピングモード
  */
 export type ScrapingMode = 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { establishSession } from '../utils/session.js';
 import { fetchCardDetail, type CardDetail } from '../utils/fetchers.js';
 import { escapeForTsv } from '../utils/formatters.js';
-import { sleep, parseScrapingMode } from '../utils/helpers.js';
+import { sleep, randomDelay, parseScrapingMode } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,15 +20,6 @@ const CONFIG = {
 // ============================================================================
 // ユーティリティ関数
 // ============================================================================
-
-/**
- * ランダム遅延（1000-3000ms）
- */
-function randomDelay(): Promise<void> {
-  const delay = Math.floor(Math.random() * (CONFIG.DELAY_MAX_MS - CONFIG.DELAY_MIN_MS + 1)) + CONFIG.DELAY_MIN_MS;
-  console.log(`  待機: ${delay}ms`);
-  return sleep(delay);
-}
 
 /**
  * 既存TSVからcardIdセットを読み込む
