@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect, beforeAll } from 'bun:test';
 import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -37,22 +37,21 @@ function getTsvHeaderFieldCount(): number {
 
 describe('TSVカラム数の整合性テスト', () => {
   const expectedFieldCount = getTsvHeaderFieldCount();
+  let lines: string[] = [];
+
+  beforeAll(() => {
+    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
+    if (fs.existsSync(tsvPath)) {
+      const content = fs.readFileSync(tsvPath, 'utf8');
+      lines = content.split('\n').filter(line => line.trim());
+    }
+  });
 
   test('ヘッダーは23フィールドである', () => {
     expect(expectedFieldCount).toBe(23);
   });
 
   test('既存のTSVファイルのヘッダーが正しいフィールド数である', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length === 0) {
       console.warn('TSVファイルが空です。テストをスキップします。');
       return;
@@ -63,16 +62,6 @@ describe('TSVカラム数の整合性テスト', () => {
   });
 
   test('モンスターカードのデータ行が正しいフィールド数である', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
@@ -92,16 +81,6 @@ describe('TSVカラム数の整合性テスト', () => {
   });
 
   test('魔法カードのデータ行が正しいフィールド数である', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
@@ -121,16 +100,6 @@ describe('TSVカラム数の整合性テスト', () => {
   });
 
   test('罠カードのデータ行が正しいフィールド数である', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
@@ -151,23 +120,26 @@ describe('TSVカラム数の整合性テスト', () => {
 });
 
 describe('TSVカラム内容の整合性テスト', () => {
-  test('モンスターカードのattributeカラムに属性値が入っている', () => {
+  let lines: string[] = [];
+  let header: string[] = [];
+
+  beforeAll(() => {
     const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
+    if (fs.existsSync(tsvPath)) {
+      const content = fs.readFileSync(tsvPath, 'utf8');
+      lines = content.split('\n').filter(line => line.trim());
+      if (lines.length > 0) {
+        header = lines[0].split('\t');
+      }
     }
+  });
 
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
+  test('モンスターカードのattributeカラムに属性値が入っている', () => {
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
     }
 
-    const header = lines[0].split('\t');
     const attributeIndex = header.indexOf('attribute');
 
     expect(attributeIndex).toBeGreaterThanOrEqual(0);
@@ -190,22 +162,11 @@ describe('TSVカラム内容の整合性テスト', () => {
   });
 
   test('モンスターカードのraceカラムに種族値が入っている', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
     }
 
-    const header = lines[0].split('\t');
     const raceIndex = header.indexOf('race');
 
     expect(raceIndex).toBeGreaterThanOrEqual(0);
@@ -227,22 +188,11 @@ describe('TSVカラム内容の整合性テスト', () => {
   });
 
   test('モンスターカードのlevelTypeカラムにレベルタイプが入っている', () => {
-    const tsvPath = path.join(__dirname, '../../output/data/cards-all.tsv');
-
-    if (!fs.existsSync(tsvPath)) {
-      console.warn('TSVファイルが存在しません。テストをスキップします。');
-      return;
-    }
-
-    const content = fs.readFileSync(tsvPath, 'utf8');
-    const lines = content.split('\n').filter(line => line.trim());
-
     if (lines.length < 2) {
       console.warn('TSVファイルにデータがありません。テストをスキップします。');
       return;
     }
 
-    const header = lines[0].split('\t');
     const levelTypeIndex = header.indexOf('levelType');
 
     expect(levelTypeIndex).toBeGreaterThanOrEqual(0);
