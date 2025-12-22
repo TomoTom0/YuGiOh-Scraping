@@ -4,7 +4,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import https from 'https';
 import { establishSession } from '../utils/session.js';
-import { sleep } from '../utils/helpers.js';
+import { randomDelay } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -118,7 +118,7 @@ async function main() {
 
     // サーバーに負荷をかけないよう待機（1秒）
     if (page < totalPages) {
-      await sleep(1000);
+      await randomDelay();
     }
   }
 

@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "test": "bun test",
+    "download:tsv": "bash scripts/download-latest-tsv.sh",
     "update:cards": "bun run src/update.ts cards",
     "update:detail": "bun run src/update.ts detail",
     "update:faq": "bun run src/update.ts faq",

@@ -2,7 +2,7 @@ import { JSDOM } from 'jsdom';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseSearchResultRow, extractImageInfo } from './parse-to-tsv';
-import { parseScrapingMode, type ScrapingMode } from '../utils/helpers.js';
+import { parseScrapingMode, randomDelay, type ScrapingMode } from '../utils/helpers.js';
 
 // ============================================================================
 // 設定
@@ -13,7 +13,8 @@ const CONFIG = {
   RESULTS_PER_PAGE: 100, // 増分取得では少なめに
   SORT_NEWER: 21, // 発売日(新しい順)
   LOCALE: 'ja',
-  DELAY_MS: 1000, // リクエスト間隔
+  DELAY_MIN_MS: 1000, // リクエスト間隔最小値
+  DELAY_MAX_MS: 3000, // リクエスト間隔最大値
 };
 
 // ============================================================================
@@ -155,7 +156,7 @@ async function fetchTopN(n: number): Promise<FetchResult> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -227,7 +228,7 @@ async function fetchRange(start: number, length: number): Promise<FetchResult> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -295,7 +296,7 @@ async function fetchIncremental(existingCardIds: Set<string>): Promise<FetchResu
         }
 
         page++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
     } catch (error) {
@@ -369,6 +370,8 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(escapeForTsv(card.pendulumScale !== undefined ? card.pendulumScale.toString() : ''));
     fields.push(escapeForTsv(card.pendulumText || ''));
     fields.push(escapeForTsv(card.isExtraDeck.toString()));
+    fields.push(''); // spellEffectType
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'spell') {
     fields.push(''); // attribute
     fields.push(''); // levelType
@@ -382,6 +385,7 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(''); // pendulumText
     fields.push(''); // isExtraDeck
     fields.push(escapeForTsv(card.effectType || ''));
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'trap') {
     fields.push(''); // attribute
     fields.push(''); // levelType
@@ -395,7 +399,7 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(''); // pendulumText
     fields.push(''); // isExtraDeck
     fields.push(''); // spellEffectType
-    fields.push(escapeForTsv(card.effectType || ''));
+    fields.push(escapeForTsv(card.effectType || '')); // trapEffectType
   }
 
   return fields.join('\t');

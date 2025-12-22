@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { establishSession } from '../utils/session.js';
 import { fetchFaqDetail } from '../utils/fetchers.js';
 import { escapeForTsv } from '../utils/formatters.js';
-import { sleep } from '../utils/helpers.js';
+import { randomDelay } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -151,7 +151,7 @@ async function main() {
 
     // サーバーに負荷をかけないよう待機（1秒）
     if (i < faqIds.length - 1) {
-      await sleep(1000);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
 
     // 1000件ごとに中間ファイルを保存（エラー時の復旧用）

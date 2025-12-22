@@ -6,7 +6,7 @@ import https from 'https';
 import { establishSession } from '../utils/session.js';
 import { fetchFaqDetail, type FaqDetail } from '../utils/fetchers.js';
 import { escapeForTsv } from '../utils/formatters.js';
-import { sleep, parseScrapingMode } from '../utils/helpers.js';
+import { sleep, randomDelay, parseScrapingMode } from '../utils/helpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,7 +19,8 @@ const CONFIG = {
   RESULTS_PER_PAGE: 100,
   SORT_UPDATED: 2, // 更新日時順（新しい順）
   LOCALE: 'ja',
-  DELAY_MS: 1000,
+  DELAY_MIN_MS: 1000,
+  DELAY_MAX_MS: 3000,
 };
 
 // ============================================================================
@@ -112,7 +113,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
         }
 
         if (i < toFetch.length - 1 || faqs.length < n) {
-          await sleep(CONFIG.DELAY_MS);
+          await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
         }
       }
 
@@ -129,7 +130,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -183,7 +184,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
         }
 
         currentIndex++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
       console.log(`  取得: (合計: ${faqs.length}/${length})`);
@@ -199,7 +200,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
       }
 
       page++;
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -296,7 +297,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
             newFaqs.push(detail);
             newInPage++;
           }
-          await sleep(CONFIG.DELAY_MS);
+          await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
         }
       }
 
@@ -308,7 +309,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
           break;
         }
         page++;
-        await sleep(CONFIG.DELAY_MS);
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
     } catch (error) {
@@ -405,7 +406,7 @@ async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise
     }
 
     if (i < faqIds.length - 1) {
-      await sleep(CONFIG.DELAY_MS);
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
   }
 
