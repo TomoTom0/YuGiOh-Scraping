@@ -370,6 +370,8 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(escapeForTsv(card.pendulumScale !== undefined ? card.pendulumScale.toString() : ''));
     fields.push(escapeForTsv(card.pendulumText || ''));
     fields.push(escapeForTsv(card.isExtraDeck.toString()));
+    fields.push(''); // spellEffectType
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'spell') {
     fields.push(''); // attribute
     fields.push(''); // levelType
@@ -383,6 +385,7 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(''); // pendulumText
     fields.push(''); // isExtraDeck
     fields.push(escapeForTsv(card.effectType || ''));
+    fields.push(''); // trapEffectType
   } else if (card.cardType === 'trap') {
     fields.push(''); // attribute
     fields.push(''); // levelType
@@ -396,7 +399,7 @@ function cardInfoToTsvRow(card: any): string {
     fields.push(''); // pendulumText
     fields.push(''); // isExtraDeck
     fields.push(''); // spellEffectType
-    fields.push(escapeForTsv(card.effectType || ''));
+    fields.push(escapeForTsv(card.effectType || '')); // trapEffectType
   }
 
   return fields.join('\t');
