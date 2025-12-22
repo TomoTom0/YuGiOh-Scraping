@@ -151,7 +151,7 @@ async function main() {
 
     // サーバーに負荷をかけないよう待機（1秒）
     if (i < faqIds.length - 1) {
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
 
     // 1000件ごとに中間ファイルを保存（エラー時の復旧用）

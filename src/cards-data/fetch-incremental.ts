@@ -156,7 +156,7 @@ async function fetchTopN(n: number): Promise<FetchResult> {
       }
 
       page++;
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -228,7 +228,7 @@ async function fetchRange(start: number, length: number): Promise<FetchResult> {
       }
 
       page++;
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -296,7 +296,7 @@ async function fetchIncremental(existingCardIds: Set<string>): Promise<FetchResu
         }
 
         page++;
-        await randomDelay();
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
     } catch (error) {

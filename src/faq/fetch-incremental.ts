@@ -113,7 +113,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
         }
 
         if (i < toFetch.length - 1 || faqs.length < n) {
-          await randomDelay();
+          await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
         }
       }
 
@@ -130,7 +130,7 @@ async function fetchTopN(n: number, cookieJar: string): Promise<FaqInfo[]> {
       }
 
       page++;
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -184,7 +184,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
         }
 
         currentIndex++;
-        await randomDelay();
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
       console.log(`  取得: (合計: ${faqs.length}/${length})`);
@@ -200,7 +200,7 @@ async function fetchRange(start: number, length: number, cookieJar: string): Pro
       }
 
       page++;
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
 
     } catch (error) {
       console.error(`  エラー: ${error}`);
@@ -297,7 +297,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
             newFaqs.push(detail);
             newInPage++;
           }
-          await randomDelay();
+          await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
         }
       }
 
@@ -309,7 +309,7 @@ async function fetchIncremental(existingFaqs: Map<string, string>, cookieJar: st
           break;
         }
         page++;
-        await randomDelay();
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
 
     } catch (error) {
@@ -406,7 +406,7 @@ async function fetchSpecificFaqIds(faqIds: string[], cookieJar: string): Promise
     }
 
     if (i < faqIds.length - 1) {
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
   }
 

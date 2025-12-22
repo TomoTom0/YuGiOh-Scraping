@@ -129,7 +129,7 @@ async function fetchTopN(n: number, cardsPath: string, cookieJar: string): Promi
     }
 
     if (i < topCardIds.length - 1) {
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
   }
 
@@ -180,7 +180,7 @@ async function fetchRange(start: number, length: number, cardsPath: string, cook
     }
 
     if (i < rangeCardIds.length - 1) {
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
   }
 
@@ -221,7 +221,7 @@ async function fetchSpecificCardIds(cardIds: string[], cookieJar: string): Promi
     }
 
     if (i < cardIds.length - 1) {
-      await randomDelay();
+      await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
     }
   }
 
@@ -396,7 +396,7 @@ async function main() {
 
       // サーバー負荷軽減
       if (i < newCardIds.length - 1) {
-        await randomDelay();
+        await randomDelay(CONFIG.DELAY_MIN_MS, CONFIG.DELAY_MAX_MS);
       }
     }
 

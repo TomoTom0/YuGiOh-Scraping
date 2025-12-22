@@ -28,15 +28,17 @@ echo "ダウンロードURL: $LATEST_RELEASE_URL"
 echo ""
 
 # tar.gzファイルをダウンロード
-TEMP_FILE="/tmp/ygo-data-latest.tar.gz"
+# 一時ディレクトリを作成
+TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT # スクリプト終了時に一時ディレクトリを削除
+
+# tar.gzファイルをダウンロード
+TEMP_FILE="$TEMP_DIR/ygo-data-latest.tar.gz"
 echo "ダウンロード中..."
 curl -L "$LATEST_RELEASE_URL" -o "$TEMP_FILE"
 
 echo "展開中..."
 tar -xzf "$TEMP_FILE" -C "$OUTPUT_DIR"
-
-echo "一時ファイルを削除中..."
-rm "$TEMP_FILE"
 
 echo ""
 echo "=== ダウンロード完了 ==="
